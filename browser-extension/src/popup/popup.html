@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 350px;
+      padding: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+    }
+    h3 {
+      margin: 0 0 15px 0;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h3::before {
+      content: "🐱";
+    }
+    .section {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      color: #6b7280;
+      font-size: 11px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .current-page .value {
+      color: #111827;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .current-page .value.none {
+      color: #9ca3af;
+      font-style: italic;
+    }
+
+    /* Queue Section */
+    .queue-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .queue-controls input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .queue-controls input:focus {
+      outline: none;
+      border-color: #8b5cf6;
+    }
+    .queue-stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .queue-stat {
+      text-align: center;
+    }
+    .queue-stat .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #8b5cf6;
+    }
+    .queue-stat .label {
+      font-size: 10px;
+      color: #6b7280;
+      text-transform: uppercase;
+    }
+    .queue-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: white;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .queue-item .type-icon {
+      font-size: 14px;
+    }
+    .queue-item .type-name {
+      flex: 1;
+      font-weight: 500;
+    }
+    .queue-item .priority {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .queue-item .priority.high { background: #fef2f2; color: #dc2626; }
+    .queue-item .priority.medium { background: #fffbeb; color: #d97706; }
+    .queue-item .priority.low { background: #f0fdf4; color: #16a34a; }
+
+    .queue-empty {
+      text-align: center;
+      padding: 20px;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    /* Progress */
+    .progress-container {
+      margin-top: 10px;
+    }
+    .progress-bar {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #8b5cf6;
+      transition: width 0.3s;
+    }
+    .progress-text {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* Buttons */
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.2s;
+      width: 100%;
+      margin: 4px 0;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background-color: #8b5cf6;
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background-color: #7c3aed;
+    }
+    .btn-secondary {
+      background-color: #e5e7eb;
+      color: #374151;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background-color: #d1d5db;
+    }
+    .btn-danger {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background-color: #fecaca;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-row button {
+      flex: 1;
+    }
+
+    /* Status */
+    #status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      display: none;
+    }
+    #status.success {
+      display: block;
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    #status.error {
+      display: block;
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+    #status.info {
+      display: block;
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    /* Server Status */
+    .server-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .server-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .server-dot.online { background: #10b981; }
+    .server-dot.offline { background: #ef4444; }
+  </style>
+</head>
+<body>
+  <h3>CatKnows</h3>
+
+  <!-- Current Page -->
+  <div class="section current-page">
+    <div class="section-title">Current Community</div>
+    <div class="value" id="currentCommunity">Loading...</div>
+  </div>
+
+  <!-- Fetch Queue -->
+  <div class="section">
+    <div class="section-title">Fetch Queue</div>
+    <div class="queue-controls">
+      <input type="text" id="communityInput" placeholder="Enter Community ID...">
+      <button class="btn-secondary" id="loadQueueBtn" style="width: auto; padding: 8px 12px;">Load</button>
+    </div>
+
+    <div class="queue-stats" id="queueStats" style="display: none;">
+      <div class="queue-stat">
+        <div class="value" id="totalTasks">0</div>
+        <div class="label">Tasks</div>
+      </div>
+      <div class="queue-stat">
+        <div class="value" id="completedTasks">0</div>
+        <div class="label">Done</div>
+      </div>
+      <div class="queue-stat">
+        <div class="value" id="remainingTasks">0</div>
+        <div class="label">Pending</div>
+      </div>
+    </div>
+
+    <div class="queue-list" id="queueList">
+      <div class="queue-empty">No queue loaded</div>
+    </div>
+
+    <div class="progress-container" id="progressContainer" style="display: none;">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div class="progress-text" id="progressText">0 / 0 Tasks</div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <button class="btn-primary" id="startQueueBtn" disabled>Process Queue</button>
+  <div class="btn-row">
+    <button class="btn-secondary" id="stopQueueBtn" disabled>Stop</button>
+    <button class="btn-danger" id="clearCacheBtn">Clear Cache</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="server-status">
+    <div class="server-dot" id="serverDot"></div>
+    <span id="serverStatus">Checking server...</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

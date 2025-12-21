@@ -1,0 +1,153 @@
+.selection-card {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  margin-top: 8px;
+}
+
+.selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.selection-header:hover {
+  background: var(--bg-alt);
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-type {
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.selection-name {
+  font-weight: 500;
+}
+
+.selection-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.result-count {
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+}
+
+.expand-icon {
+  font-size: 0.8em;
+}
+
+.selection-details {
+  padding: 12px;
+}
+
+.filter-section {
+  margin-bottom: 12px;
+}
+
+.filter-section strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.filter-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9em;
+}
+
+.filter-list li {
+  margin-bottom: 4px;
+}
+
+.filter-key {
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.filter-value {
+  font-family: monospace;
+  background: var(--bg-alt);
+  padding: 1px 4px;
+}
+
+.view-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.view-selector span {
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.view-selector button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--text);
+}
+
+.view-selector button:hover {
+  background: var(--bg-alt);
+}
+
+.view-selector button.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.results-preview {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.preview-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.add-to-report-btn {
+  padding: 6px 12px;
+  background: none;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.9em;
+  color: var(--text);
+}
+
+.add-to-report-btn:hover {
+  background: var(--bg-alt);
+}

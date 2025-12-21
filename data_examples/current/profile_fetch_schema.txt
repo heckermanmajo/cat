@@ -1,0 +1,1273 @@
+{
+  "pageProps":   {
+    "total":     integer
+    "hasMore":     boolean
+    "postTrees":     [
+      {
+        "post":         {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "action":             integer
+            "attachments":             string
+            "comments":             integer
+            "content":             string
+            "contributors":             string
+            "imagePreview":             string
+            "imagePreviewSmall":             string
+            "labels":             string
+            "lastComment":             integer
+            "lastCommentId":             string
+            "lastCommentView":             integer
+            "myView":             integer
+            "rca":             string
+            "title":             string
+            "upvotes":             integer
+            "videoIds":             string
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "groupId":           string
+          "userId":           string
+          "postType":           string
+          "rootId":           string
+          "labelId":           string
+          "user":           {
+            "id":             string
+            "name":             string
+            "metadata":             {
+              "actStatus":               string
+              "aflCode":               string
+              "aflSetup":               string
+              "appD":               integer
+              "audienceSize":               integer
+              "bio":               string
+              "catEnabled":               integer
+              "gamesEnabled":               integer
+              "lastOffline":               integer
+              "linkFacebook":               string
+              "linkInstagram":               string
+              "linkLinkedin":               string
+              "linkTwitter":               string
+              "linkWebsite":               string
+              "linkYoutube":               string
+              "location":               string
+              "myersBriggs":               string
+              "nameChanges":               integer
+              "notifs":               integer
+              "payoutAccountId":               string
+              "pictureBubble":               string
+              "pictureProfile":               string
+              "profileHiddenGroupIds":               string
+              "realNameChanges":               integer
+              "spData":               string
+              "theme":               string
+              "timezone":               string
+              "unreadChats":               integer
+            }
+            "createdAt":             string
+            "updatedAt":             string
+            "email":             string
+            "firstName":             string
+            "lastName":             string
+          }
+        }
+        "children":         [
+          {
+            "post":             {
+              "id":               string
+              "metadata":               {
+                "action":                 integer
+                "content":                 string
+                "myVote":                 string
+                "upvotes":                 integer
+                "videoIds":                 string
+              }
+              "createdAt":               string
+              "updatedAt":               string
+              "groupId":               string
+              "userId":               string
+              "postType":               string
+              "parentId":               string
+              "rootId":               string
+              "user":               {
+                "id":                 string
+                "name":                 string
+                "metadata":                 {
+                  "bio":                   string
+                  "lastOffline":                   integer
+                  "linkFacebook":                   string
+                  "linkInstagram":                   string
+                  "linkLinkedin":                   string
+                  "linkTwitter":                   string
+                  "linkWebsite":                   string
+                  "linkYoutube":                   string
+                  "location":                   string
+                  "myersBriggs":                   string
+                  "pictureBubble":                   string
+                  "pictureProfile":                   string
+                  "spData":                   string
+                }
+                "createdAt":                 string
+                "updatedAt":                 string
+                "email":                 string
+                "firstName":                 string
+                "lastName":                 string
+              }
+            }
+          }
+        ]
+      }
+    ]
+    "totalGroups":     integer
+    "settings":     {
+      "mainMenuName":       string
+      "mainMenuItem":       string
+      "showMobileHeaderCard":       boolean
+      "hideMobileMainMenu":       boolean
+      "pageTitle":       string
+      "pageMeta":       {
+        "title":         string
+        "description":         string
+        "image":         string
+        "touchIcon":         string
+      }
+    }
+    "currentUser":     {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "bio":         string
+        "lastOffline":         integer
+        "linkFacebook":         string
+        "linkInstagram":         string
+        "linkLinkedin":         string
+        "linkTwitter":         string
+        "linkWebsite":         string
+        "linkYoutube":         string
+        "location":         string
+        "myersBriggs":         string
+        "pictureBubble":         string
+        "pictureProfile":         string
+        "spData":         string
+      }
+      "createdAt":       string
+      "updatedAt":       string
+      "email":       string
+      "firstName":       string
+      "lastName":       string
+      "profileData":       {
+        "page":         integer
+        "filter":         string
+        "tabName":         string
+        "itemsPerPage":         integer
+        "member":         {
+          "id":           string
+          "metadata":           {
+            "numGenericPosts":             integer
+            "numRequests":             integer
+            "onPc":             integer
+            "requestLocation":             string
+            "requestedAt":             integer
+            "survey":             string
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "userId":           string
+          "groupId":           string
+          "role":           string
+          "searchAnswer":           string
+          "approvedAt":           string
+          "lastOffline":           string
+        }
+        "following":         boolean
+        "followed":         boolean
+        "totalPosts":         integer
+        "totalFollowers":         integer
+        "totalFollowing":         integer
+        "totalSharedGroups":         integer
+        "groupsMemberOf":         [
+          {
+            "id":             string
+            "name":             string
+            "metadata":             {
+              "aflPercent":               integer
+              "apiKeys":               string
+              "autoAflUser":               string
+              "billingCycleEnd":               integer
+              "billingEmail":               string
+              "color":               string
+              "coverSmallUrl":               string
+              "createdBy":               string
+              "description":               string
+              "displayName":               string
+              "faviconUrl":               string
+              "gbAccountCountry":               string
+              "gbSetupStatus":               string
+              "gbStmtDesc":               string
+              "gbSupportEmail":               string
+              "initials":               string
+              "isLegacyHosting":               integer
+              "labels":               string
+              "lastNotifyAll":               integer
+              "levels":               string
+              "links":               string
+              "liveCallHandle":               string
+              "logoBigUrl":               string
+              "logoUrl":               string
+              "lpAttachmentsData":               string
+              "lpDescription":               string
+              "membership":               integer
+              "nameChanges":               integer
+              "numCourses":               integer
+              "numDraftCourses":               integer
+              "numModules":               integer
+              "onboardingVideo":               string
+              "onlineUsers":               string
+              "owner":               string
+              "paymentCard":               string
+              "paymentStatus":               string
+              "pluginAutoDmEnabled":               integer
+              "pluginMinChatLevelEnabled":               integer
+              "pluginZapierEnabled":               integer
+              "privacy":               integer
+              "survey":               string
+              "surveyEnabled":               integer
+              "tabs":               string
+              "totalAdmins":               integer
+              "totalMembers":               integer
+              "totalOnlineMembers":               integer
+              "totalPosts":               integer
+              "totalReports":               integer
+              "totalRequests":               integer
+              "totalRules":               integer
+            }
+            "createdAt":             string
+            "updatedAt":             string
+          }
+        ]
+        "groupsCreatedByUser":         [
+          {
+            "id":             string
+            "name":             string
+            "metadata":             {
+              "color":               string
+              "coverSmallUrl":               string
+              "createdBy":               string
+              "description":               string
+              "displayName":               string
+              "faviconUrl":               string
+              "initials":               string
+              "logoBigUrl":               string
+              "logoUrl":               string
+              "lpAttachmentsData":               string
+              "lpDescription":               string
+              "membership":               integer
+              "noCategories":               integer
+              "owner":               string
+              "plan":               string
+              "privacy":               integer
+              "srcGroup":               string
+              "tabs":               string
+              "totalAdmins":               integer
+              "totalMembers":               integer
+              "totalOnlineMembers":               integer
+              "totalPosts":               integer
+              "totalRules":               integer
+            }
+            "createdAt":             string
+            "updatedAt":             string
+          }
+        ]
+        "totalContributions":         integer
+        "chatRequest":         boolean
+        "dailyActivities":         {
+          "startDate":           string
+          "endDate":           string
+          "counts":           [
+            integer
+          ]
+        }
+        "totalGroups":         integer
+        "posts":         {
+          "posts":           [
+            {
+              "post":               {
+                "id":                 string
+                "name":                 string
+                "metadata":                 {
+                  "action":                   integer
+                  "attachments":                   string
+                  "comments":                   integer
+                  "content":                   string
+                  "contributors":                   string
+                  "imagePreview":                   string
+                  "imagePreviewSmall":                   string
+                  "labels":                   string
+                  "lastComment":                   integer
+                  "lastCommentId":                   string
+                  "lastCommentView":                   integer
+                  "myView":                   integer
+                  "rca":                   string
+                  "title":                   string
+                  "upvotes":                   integer
+                  "videoIds":                   string
+                }
+                "createdAt":                 string
+                "updatedAt":                 string
+                "groupId":                 string
+                "userId":                 string
+                "postType":                 string
+                "rootId":                 string
+                "labelId":                 string
+                "user":                 {
+                  "id":                   string
+                  "name":                   string
+                  "metadata":                   {
+                    "actStatus":                     string
+                    "aflCode":                     string
+                    "aflSetup":                     string
+                    "appD":                     integer
+                    "audienceSize":                     integer
+                    "bio":                     string
+                    "catEnabled":                     integer
+                    "gamesEnabled":                     integer
+                    "lastOffline":                     integer
+                    "linkFacebook":                     string
+                    "linkInstagram":                     string
+                    "linkLinkedin":                     string
+                    "linkTwitter":                     string
+                    "linkWebsite":                     string
+                    "linkYoutube":                     string
+                    "location":                     string
+                    "myersBriggs":                     string
+                    "nameChanges":                     integer
+                    "notifs":                     integer
+                    "payoutAccountId":                     string
+                    "pictureBubble":                     string
+                    "pictureProfile":                     string
+                    "profileHiddenGroupIds":                     string
+                    "realNameChanges":                     integer
+                    "spData":                     string
+                    "theme":                     string
+                    "timezone":                     string
+                    "unreadChats":                     integer
+                  }
+                  "createdAt":                   string
+                  "updatedAt":                   string
+                  "email":                   string
+                  "firstName":                   string
+                  "lastName":                   string
+                }
+              }
+              "children":               [
+                {
+                  "post":                   {
+                    "id":                     string
+                    "metadata":                     {
+                      "action":                       integer
+                      "content":                       string
+                      "myVote":                       string
+                      "upvotes":                       integer
+                      "videoIds":                       string
+                    }
+                    "createdAt":                     string
+                    "updatedAt":                     string
+                    "groupId":                     string
+                    "userId":                     string
+                    "postType":                     string
+                    "parentId":                     string
+                    "rootId":                     string
+                    "user":                     {
+                      "id":                       string
+                      "name":                       string
+                      "metadata":                       {
+                        "bio":                         string
+                        "lastOffline":                         integer
+                        "linkFacebook":                         string
+                        "linkInstagram":                         string
+                        "linkLinkedin":                         string
+                        "linkTwitter":                         string
+                        "linkWebsite":                         string
+                        "linkYoutube":                         string
+                        "location":                         string
+                        "myersBriggs":                         string
+                        "pictureBubble":                         string
+                        "pictureProfile":                         string
+                        "spData":                         string
+                      }
+                      "createdAt":                       string
+                      "updatedAt":                       string
+                      "email":                       string
+                      "firstName":                       string
+                      "lastName":                       string
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+          "total":           integer
+        }
+      }
+    }
+    "msg":     string
+    "self":     {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "actStatus":         string
+        "aflCode":         string
+        "aflSetup":         string
+        "appD":         integer
+        "audienceSize":         integer
+        "bio":         string
+        "catEnabled":         integer
+        "gamesEnabled":         integer
+        "lastOffline":         integer
+        "linkFacebook":         string
+        "linkInstagram":         string
+        "linkLinkedin":         string
+        "linkTwitter":         string
+        "linkWebsite":         string
+        "linkYoutube":         string
+        "location":         string
+        "myersBriggs":         string
+        "nameChanges":         integer
+        "notifs":         integer
+        "payoutAccountId":         string
+        "pictureBubble":         string
+        "pictureProfile":         string
+        "profileHiddenGroupIds":         string
+        "realNameChanges":         integer
+        "spData":         string
+        "theme":         string
+        "timezone":         string
+        "unreadChats":         integer
+      }
+      "createdAt":       string
+      "updatedAt":       string
+      "email":       string
+      "firstName":       string
+      "lastName":       string
+      "member":       {
+        "id":         string
+        "metadata":         {
+          "billingMgr":           integer
+          "chatLvlAllowed":           integer
+          "numGenericPosts":           integer
+          "onPc":           integer
+          "requestedAt":           integer
+        }
+        "createdAt":         string
+        "updatedAt":         string
+        "userId":         string
+        "groupId":         string
+        "role":         string
+        "approvedAt":         string
+        "lastOffline":         string
+      }
+      "allGroups":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "aflPercent":             integer
+            "apiKeys":             string
+            "autoAflUser":             string
+            "billingCycleEnd":             integer
+            "billingEmail":             string
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "gbAccountCountry":             string
+            "gbSetupStatus":             string
+            "gbStmtDesc":             string
+            "gbSupportEmail":             string
+            "initials":             string
+            "isLegacyHosting":             integer
+            "labels":             string
+            "lastNotifyAll":             integer
+            "levels":             string
+            "links":             string
+            "liveCallHandle":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "nameChanges":             integer
+            "numCourses":             integer
+            "numDraftCourses":             integer
+            "numModules":             integer
+            "onboardingVideo":             string
+            "onlineUsers":             string
+            "owner":             string
+            "paymentCard":             string
+            "paymentStatus":             string
+            "pluginAutoDmEnabled":             integer
+            "pluginMinChatLevelEnabled":             integer
+            "pluginZapierEnabled":             integer
+            "privacy":             integer
+            "survey":             string
+            "surveyEnabled":             integer
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalReports":             integer
+            "totalRequests":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "allTags":       null
+      "hasMore":       boolean
+      "pinnedGroups":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "aflPercent":             integer
+            "apiKeys":             string
+            "autoAflUser":             string
+            "billingCycleEnd":             integer
+            "billingEmail":             string
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "gbAccountCountry":             string
+            "gbSetupStatus":             string
+            "gbStmtDesc":             string
+            "gbSupportEmail":             string
+            "initials":             string
+            "isLegacyHosting":             integer
+            "labels":             string
+            "lastNotifyAll":             integer
+            "levels":             string
+            "links":             string
+            "liveCallHandle":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "nameChanges":             integer
+            "numCourses":             integer
+            "numDraftCourses":             integer
+            "numModules":             integer
+            "onboardingVideo":             string
+            "onlineUsers":             string
+            "owner":             string
+            "paymentCard":             string
+            "paymentStatus":             string
+            "pluginAutoDmEnabled":             integer
+            "pluginMinChatLevelEnabled":             integer
+            "pluginZapierEnabled":             integer
+            "privacy":             integer
+            "survey":             string
+            "surveyEnabled":             integer
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalReports":             integer
+            "totalRequests":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "switcherHiddenGroups":       {
+      }
+    }
+    "currentGroup":     {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "aflPercent":         integer
+        "apiKeys":         string
+        "autoAflUser":         string
+        "billingCycleEnd":         integer
+        "billingEmail":         string
+        "color":         string
+        "coverSmallUrl":         string
+        "createdBy":         string
+        "description":         string
+        "displayName":         string
+        "faviconUrl":         string
+        "gbAccountCountry":         string
+        "gbSetupStatus":         string
+        "gbStmtDesc":         string
+        "gbSupportEmail":         string
+        "initials":         string
+        "isLegacyHosting":         integer
+        "labels":         string
+        "lastNotifyAll":         integer
+        "levels":         string
+        "links":         string
+        "liveCallHandle":         string
+        "logoBigUrl":         string
+        "logoUrl":         string
+        "lpAttachmentsData":         string
+        "lpDescription":         string
+        "membership":         integer
+        "nameChanges":         integer
+        "numCourses":         integer
+        "numDraftCourses":         integer
+        "numModules":         integer
+        "onboardingVideo":         string
+        "onlineUsers":         string
+        "owner":         string
+        "paymentCard":         string
+        "paymentStatus":         string
+        "pluginAutoDmEnabled":         integer
+        "pluginMinChatLevelEnabled":         integer
+        "pluginZapierEnabled":         integer
+        "privacy":         integer
+        "selfChat":         string
+        "survey":         string
+        "surveyEnabled":         integer
+        "tabs":         string
+        "totalAdmins":         integer
+        "totalMembers":         integer
+        "totalOnlineMembers":         integer
+        "totalPosts":         integer
+        "totalReports":         integer
+        "totalRequests":         integer
+        "totalRules":         integer
+      }
+      "createdAt":       string
+      "updatedAt":       string
+      "labels":       [
+        {
+          "id":           string
+          "metadata":           {
+            "color":             string
+            "defaultSort":             string
+            "description":             string
+            "displayName":             string
+            "postWriteRole":             integer
+            "posts":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "groupId":           string
+        }
+      ]
+      "onlineUsers":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "pictureBubble":             string
+            "pictureProfile":             string
+            "spData":             string
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "email":           string
+          "firstName":           string
+          "lastName":           string
+        }
+      ]
+    }
+    "isMobile":     boolean
+    "isApp":     boolean
+    "userAgent":     string
+    "maintenance":     {
+    }
+    "currentPage":     {
+      "query":       {
+        "g":         string
+        "group":         string
+      }
+      "pageKey":       string
+      "path":       string
+      "isPostDetails":       boolean
+      "isChat":       boolean
+    }
+    "renderData":     {
+      "user":       {
+        "id":         string
+        "name":         string
+        "metadata":         {
+          "bio":           string
+          "lastOffline":           integer
+          "linkFacebook":           string
+          "linkInstagram":           string
+          "linkLinkedin":           string
+          "linkTwitter":           string
+          "linkWebsite":           string
+          "linkYoutube":           string
+          "location":           string
+          "myersBriggs":           string
+          "pictureBubble":           string
+          "pictureProfile":           string
+          "spData":           string
+        }
+        "createdAt":         string
+        "updatedAt":         string
+        "email":         string
+        "firstName":         string
+        "lastName":         string
+        "profileData":         {
+          "page":           integer
+          "filter":           string
+          "tabName":           string
+          "itemsPerPage":           integer
+          "member":           {
+            "id":             string
+            "metadata":             {
+              "numGenericPosts":               integer
+              "numRequests":               integer
+              "onPc":               integer
+              "requestLocation":               string
+              "requestedAt":               integer
+              "survey":               string
+            }
+            "createdAt":             string
+            "updatedAt":             string
+            "userId":             string
+            "groupId":             string
+            "role":             string
+            "searchAnswer":             string
+            "approvedAt":             string
+            "lastOffline":             string
+          }
+          "following":           boolean
+          "followed":           boolean
+          "totalPosts":           integer
+          "totalFollowers":           integer
+          "totalFollowing":           integer
+          "totalSharedGroups":           integer
+          "groupsMemberOf":           [
+            {
+              "id":               string
+              "name":               string
+              "metadata":               {
+                "aflPercent":                 integer
+                "apiKeys":                 string
+                "autoAflUser":                 string
+                "billingCycleEnd":                 integer
+                "billingEmail":                 string
+                "color":                 string
+                "coverSmallUrl":                 string
+                "createdBy":                 string
+                "description":                 string
+                "displayName":                 string
+                "faviconUrl":                 string
+                "gbAccountCountry":                 string
+                "gbSetupStatus":                 string
+                "gbStmtDesc":                 string
+                "gbSupportEmail":                 string
+                "initials":                 string
+                "isLegacyHosting":                 integer
+                "labels":                 string
+                "lastNotifyAll":                 integer
+                "levels":                 string
+                "links":                 string
+                "liveCallHandle":                 string
+                "logoBigUrl":                 string
+                "logoUrl":                 string
+                "lpAttachmentsData":                 string
+                "lpDescription":                 string
+                "membership":                 integer
+                "nameChanges":                 integer
+                "numCourses":                 integer
+                "numDraftCourses":                 integer
+                "numModules":                 integer
+                "onboardingVideo":                 string
+                "onlineUsers":                 string
+                "owner":                 string
+                "paymentCard":                 string
+                "paymentStatus":                 string
+                "pluginAutoDmEnabled":                 integer
+                "pluginMinChatLevelEnabled":                 integer
+                "pluginZapierEnabled":                 integer
+                "privacy":                 integer
+                "survey":                 string
+                "surveyEnabled":                 integer
+                "tabs":                 string
+                "totalAdmins":                 integer
+                "totalMembers":                 integer
+                "totalOnlineMembers":                 integer
+                "totalPosts":                 integer
+                "totalReports":                 integer
+                "totalRequests":                 integer
+                "totalRules":                 integer
+              }
+              "createdAt":               string
+              "updatedAt":               string
+            }
+          ]
+          "groupsCreatedByUser":           [
+            {
+              "id":               string
+              "name":               string
+              "metadata":               {
+                "color":                 string
+                "coverSmallUrl":                 string
+                "createdBy":                 string
+                "description":                 string
+                "displayName":                 string
+                "faviconUrl":                 string
+                "initials":                 string
+                "logoBigUrl":                 string
+                "logoUrl":                 string
+                "lpAttachmentsData":                 string
+                "lpDescription":                 string
+                "membership":                 integer
+                "noCategories":                 integer
+                "owner":                 string
+                "plan":                 string
+                "privacy":                 integer
+                "srcGroup":                 string
+                "tabs":                 string
+                "totalAdmins":                 integer
+                "totalMembers":                 integer
+                "totalOnlineMembers":                 integer
+                "totalPosts":                 integer
+                "totalRules":                 integer
+              }
+              "createdAt":               string
+              "updatedAt":               string
+            }
+          ]
+          "totalContributions":           integer
+          "chatRequest":           boolean
+          "dailyActivities":           {
+            "startDate":             string
+            "endDate":             string
+            "counts":             [
+              integer
+            ]
+          }
+          "totalGroups":           integer
+          "posts":           {
+            "posts":             [
+              {
+                "post":                 {
+                  "id":                   string
+                  "name":                   string
+                  "metadata":                   {
+                    "action":                     integer
+                    "attachments":                     string
+                    "comments":                     integer
+                    "content":                     string
+                    "contributors":                     string
+                    "imagePreview":                     string
+                    "imagePreviewSmall":                     string
+                    "labels":                     string
+                    "lastComment":                     integer
+                    "lastCommentId":                     string
+                    "lastCommentView":                     integer
+                    "myView":                     integer
+                    "rca":                     string
+                    "title":                     string
+                    "upvotes":                     integer
+                    "videoIds":                     string
+                  }
+                  "createdAt":                   string
+                  "updatedAt":                   string
+                  "groupId":                   string
+                  "userId":                   string
+                  "postType":                   string
+                  "rootId":                   string
+                  "labelId":                   string
+                  "user":                   {
+                    "id":                     string
+                    "name":                     string
+                    "metadata":                     {
+                      "actStatus":                       string
+                      "aflCode":                       string
+                      "aflSetup":                       string
+                      "appD":                       integer
+                      "audienceSize":                       integer
+                      "bio":                       string
+                      "catEnabled":                       integer
+                      "gamesEnabled":                       integer
+                      "lastOffline":                       integer
+                      "linkFacebook":                       string
+                      "linkInstagram":                       string
+                      "linkLinkedin":                       string
+                      "linkTwitter":                       string
+                      "linkWebsite":                       string
+                      "linkYoutube":                       string
+                      "location":                       string
+                      "myersBriggs":                       string
+                      "nameChanges":                       integer
+                      "notifs":                       integer
+                      "payoutAccountId":                       string
+                      "pictureBubble":                       string
+                      "pictureProfile":                       string
+                      "profileHiddenGroupIds":                       string
+                      "realNameChanges":                       integer
+                      "spData":                       string
+                      "theme":                       string
+                      "timezone":                       string
+                      "unreadChats":                       integer
+                    }
+                    "createdAt":                     string
+                    "updatedAt":                     string
+                    "email":                     string
+                    "firstName":                     string
+                    "lastName":                     string
+                  }
+                }
+                "children":                 [
+                  {
+                    "post":                     {
+                      "id":                       string
+                      "metadata":                       {
+                        "action":                         integer
+                        "content":                         string
+                        "myVote":                         string
+                        "upvotes":                         integer
+                        "videoIds":                         string
+                      }
+                      "createdAt":                       string
+                      "updatedAt":                       string
+                      "groupId":                       string
+                      "userId":                       string
+                      "postType":                       string
+                      "parentId":                       string
+                      "rootId":                       string
+                      "user":                       {
+                        "id":                         string
+                        "name":                         string
+                        "metadata":                         {
+                          "bio":                           string
+                          "lastOffline":                           integer
+                          "linkFacebook":                           string
+                          "linkInstagram":                           string
+                          "linkLinkedin":                           string
+                          "linkTwitter":                           string
+                          "linkWebsite":                           string
+                          "linkYoutube":                           string
+                          "location":                           string
+                          "myersBriggs":                           string
+                          "pictureBubble":                           string
+                          "pictureProfile":                           string
+                          "spData":                           string
+                        }
+                        "createdAt":                         string
+                        "updatedAt":                         string
+                        "email":                         string
+                        "firstName":                         string
+                        "lastName":                         string
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+            "total":             integer
+          }
+        }
+      }
+      "member":       {
+        "id":         string
+        "metadata":         {
+          "numGenericPosts":           integer
+          "numRequests":           integer
+          "onPc":           integer
+          "requestLocation":           string
+          "requestedAt":           integer
+          "survey":           string
+        }
+        "createdAt":         string
+        "updatedAt":         string
+        "userId":         string
+        "groupId":         string
+        "role":         string
+        "searchAnswer":         string
+        "approvedAt":         string
+        "lastOffline":         string
+      }
+      "following":       boolean
+      "followed":       boolean
+      "totalPosts":       integer
+      "totalFollowers":       integer
+      "totalFollowing":       integer
+      "totalSharedGroups":       integer
+      "groupsMemberOf":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "aflPercent":             integer
+            "apiKeys":             string
+            "autoAflUser":             string
+            "billingCycleEnd":             integer
+            "billingEmail":             string
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "gbAccountCountry":             string
+            "gbSetupStatus":             string
+            "gbStmtDesc":             string
+            "gbSupportEmail":             string
+            "initials":             string
+            "isLegacyHosting":             integer
+            "labels":             string
+            "lastNotifyAll":             integer
+            "levels":             string
+            "links":             string
+            "liveCallHandle":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "nameChanges":             integer
+            "numCourses":             integer
+            "numDraftCourses":             integer
+            "numModules":             integer
+            "onboardingVideo":             string
+            "onlineUsers":             string
+            "owner":             string
+            "paymentCard":             string
+            "paymentStatus":             string
+            "pluginAutoDmEnabled":             integer
+            "pluginMinChatLevelEnabled":             integer
+            "pluginZapierEnabled":             integer
+            "privacy":             integer
+            "survey":             string
+            "surveyEnabled":             integer
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalReports":             integer
+            "totalRequests":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "groupsCreatedByUser":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "initials":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "noCategories":             integer
+            "owner":             string
+            "plan":             string
+            "privacy":             integer
+            "srcGroup":             string
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "totalContributions":       integer
+      "chatRequest":       boolean
+      "dailyActivities":       {
+        "startDate":         string
+        "endDate":         string
+        "counts":         [
+          integer
+        ]
+      }
+      "totalGroups":       integer
+      "posts":       {
+        "posts":         [
+          {
+            "post":             {
+              "id":               string
+              "name":               string
+              "metadata":               {
+                "action":                 integer
+                "attachments":                 string
+                "comments":                 integer
+                "content":                 string
+                "contributors":                 string
+                "imagePreview":                 string
+                "imagePreviewSmall":                 string
+                "labels":                 string
+                "lastComment":                 integer
+                "lastCommentId":                 string
+                "lastCommentView":                 integer
+                "myView":                 integer
+                "rca":                 string
+                "title":                 string
+                "upvotes":                 integer
+                "videoIds":                 string
+              }
+              "createdAt":               string
+              "updatedAt":               string
+              "groupId":               string
+              "userId":               string
+              "postType":               string
+              "rootId":               string
+              "labelId":               string
+              "user":               {
+                "id":                 string
+                "name":                 string
+                "metadata":                 {
+                  "actStatus":                   string
+                  "aflCode":                   string
+                  "aflSetup":                   string
+                  "appD":                   integer
+                  "audienceSize":                   integer
+                  "bio":                   string
+                  "catEnabled":                   integer
+                  "gamesEnabled":                   integer
+                  "lastOffline":                   integer
+                  "linkFacebook":                   string
+                  "linkInstagram":                   string
+                  "linkLinkedin":                   string
+                  "linkTwitter":                   string
+                  "linkWebsite":                   string
+                  "linkYoutube":                   string
+                  "location":                   string
+                  "myersBriggs":                   string
+                  "nameChanges":                   integer
+                  "notifs":                   integer
+                  "payoutAccountId":                   string
+                  "pictureBubble":                   string
+                  "pictureProfile":                   string
+                  "profileHiddenGroupIds":                   string
+                  "realNameChanges":                   integer
+                  "spData":                   string
+                  "theme":                   string
+                  "timezone":                   string
+                  "unreadChats":                   integer
+                }
+                "createdAt":                 string
+                "updatedAt":                 string
+                "email":                 string
+                "firstName":                 string
+                "lastName":                 string
+              }
+            }
+            "children":             [
+              {
+                "post":                 {
+                  "id":                   string
+                  "metadata":                   {
+                    "action":                     integer
+                    "content":                     string
+                    "myVote":                     string
+                    "upvotes":                     integer
+                    "videoIds":                     string
+                  }
+                  "createdAt":                   string
+                  "updatedAt":                   string
+                  "groupId":                   string
+                  "userId":                   string
+                  "postType":                   string
+                  "parentId":                   string
+                  "rootId":                   string
+                  "user":                   {
+                    "id":                     string
+                    "name":                     string
+                    "metadata":                     {
+                      "bio":                       string
+                      "lastOffline":                       integer
+                      "linkFacebook":                       string
+                      "linkInstagram":                       string
+                      "linkLinkedin":                       string
+                      "linkTwitter":                       string
+                      "linkWebsite":                       string
+                      "linkYoutube":                       string
+                      "location":                       string
+                      "myersBriggs":                       string
+                      "pictureBubble":                       string
+                      "pictureProfile":                       string
+                      "spData":                       string
+                    }
+                    "createdAt":                     string
+                    "updatedAt":                     string
+                    "email":                     string
+                    "firstName":                     string
+                    "lastName":                     string
+                  }
+                }
+              }
+            ]
+          }
+        ]
+        "total":         integer
+      }
+    }
+    "page":     integer
+    "perPage":     integer
+    "referer":     string
+    "host":     string
+    "growthBookData":     {
+      "features":       {
+        "hormozi_aug_2025_days_14_enabled":         {
+          "defaultValue":           boolean
+        }
+        "enable_group_tiers":         {
+          "defaultValue":           boolean
+        }
+        "enable_mux_30s_buffer":         {
+          "defaultValue":           boolean
+          "rules":           [
+            {
+              "force":               boolean
+              "coverage":               number
+              "hashAttribute":               string
+            }
+          ]
+        }
+        "enable_group_analytics":         {
+          "defaultValue":           boolean
+        }
+      }
+      "experiments":       {
+      }
+    }
+    "env":     {
+      "ENV":       string
+      "CLIENT_ID_KEY":       string
+      "API_URL":       string
+      "PUBSUB_URL":       string
+      "FACEBOOK_APP_ID":       string
+      "STRIPE_PUBLISHABLE_KEY":       string
+      "BILLING_STRIPE_PUBLISHABLE_KEY":       string
+      "GIPHY_KEY":       string
+      "FB_PIXEL_ID":       string
+      "TELEMETRY_URL":       string
+      "STREAM_CLIENT_KEY":       string
+    }
+  }
+  "__N_SSP":   boolean
+}

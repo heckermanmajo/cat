@@ -1,0 +1,37 @@
+.fetch-queue-view {
+  max-width: 1200px;
+}
+
+.fetch-queue-view .subtitle {
+  color: var(--text-muted);
+  margin-top: 0;
+}
+
+.fetch-queue-view fieldset {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
+
+.fetch-queue-view .input-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fetch-queue-view .input-row input {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.fetch-queue-view .error {
+  color: #cc0000;
+}
+
+.fetch-queue-view table {
+  width: 100%;
+}

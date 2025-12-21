@@ -1,0 +1,366 @@
+{
+  "pageProps":   {
+    "settings":     {
+      "pageTitle":       string
+      "pageMeta":       {
+        "description":         string
+        "title":         string
+        "image":         string
+        "touchIcon":         string
+      }
+      "image":       string
+      "mainMenuItem":       string
+      "mainMenuName":       string
+    }
+    "allCourses":     [
+      {
+        "id":         string
+        "name":         string
+        "metadata":         {
+          "coverImage":           string
+          "coverImageFile":           string
+          "desc":           string
+          "hasAccess":           integer
+          "minAccessLevel":           integer
+          "numModules":           integer
+          "privacy":           integer
+          "title":           string
+        }
+        "createdAt":         string
+        "updatedAt":         string
+        "unitType":         string
+        "rootId":         string
+        "userId":         string
+        "groupId":         string
+        "state":         integer
+        "public":         boolean
+      }
+    ]
+    "course":     null
+    "inProgressDuplication":     null
+    "selectedModule":     string
+    "page":     integer
+    "self":     {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "actStatus":         string
+        "aflCode":         string
+        "aflSetup":         string
+        "appD":         integer
+        "audienceSize":         integer
+        "bio":         string
+        "catEnabled":         integer
+        "gamesEnabled":         integer
+        "lastOffline":         integer
+        "linkFacebook":         string
+        "linkInstagram":         string
+        "linkLinkedin":         string
+        "linkTwitter":         string
+        "linkWebsite":         string
+        "linkYoutube":         string
+        "location":         string
+        "myersBriggs":         string
+        "nameChanges":         integer
+        "notifs":         integer
+        "payoutAccountId":         string
+        "pictureBubble":         string
+        "pictureProfile":         string
+        "profileHiddenGroupIds":         string
+        "realNameChanges":         integer
+        "spData":         string
+        "theme":         string
+        "timezone":         string
+        "unreadChats":         integer
+      }
+      "createdAt":       string
+      "updatedAt":       string
+      "email":       string
+      "firstName":       string
+      "lastName":       string
+      "member":       {
+        "id":         string
+        "metadata":         {
+          "billingMgr":           integer
+          "chatLvlAllowed":           integer
+          "numGenericPosts":           integer
+          "onPc":           integer
+          "requestedAt":           integer
+        }
+        "createdAt":         string
+        "updatedAt":         string
+        "userId":         string
+        "groupId":         string
+        "role":         string
+        "approvedAt":         string
+        "lastOffline":         string
+      }
+      "allGroups":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "aflPercent":             integer
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "currentMBp":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "initials":             string
+            "labels":             string
+            "levels":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAccessType":             integer
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "noCategories":             integer
+            "numCourses":             integer
+            "numModules":             integer
+            "onboardingVideo":             string
+            "onlineUsers":             string
+            "owner":             string
+            "plan":             string
+            "privacy":             integer
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "allTags":       null
+      "hasMore":       boolean
+      "pinnedGroups":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "aflPercent":             integer
+            "apiKeys":             string
+            "autoAflUser":             string
+            "billingCycleEnd":             integer
+            "billingEmail":             string
+            "color":             string
+            "coverSmallUrl":             string
+            "createdBy":             string
+            "description":             string
+            "displayName":             string
+            "faviconUrl":             string
+            "gbAccountCountry":             string
+            "gbSetupStatus":             string
+            "gbStmtDesc":             string
+            "gbSupportEmail":             string
+            "initials":             string
+            "isLegacyHosting":             integer
+            "labels":             string
+            "lastNotifyAll":             integer
+            "levels":             string
+            "links":             string
+            "liveCallHandle":             string
+            "logoBigUrl":             string
+            "logoUrl":             string
+            "lpAttachmentsData":             string
+            "lpDescription":             string
+            "membership":             integer
+            "nameChanges":             integer
+            "numCourses":             integer
+            "numDraftCourses":             integer
+            "numModules":             integer
+            "onboardingVideo":             string
+            "onlineUsers":             string
+            "owner":             string
+            "paymentCard":             string
+            "paymentStatus":             string
+            "pluginAutoDmEnabled":             integer
+            "pluginMinChatLevelEnabled":             integer
+            "pluginZapierEnabled":             integer
+            "privacy":             integer
+            "survey":             string
+            "surveyEnabled":             integer
+            "tabs":             string
+            "totalAdmins":             integer
+            "totalMembers":             integer
+            "totalOnlineMembers":             integer
+            "totalPosts":             integer
+            "totalReports":             integer
+            "totalRequests":             integer
+            "totalRules":             integer
+          }
+          "createdAt":           string
+          "updatedAt":           string
+        }
+      ]
+      "switcherHiddenGroups":       {
+      }
+    }
+    "currentGroup":     {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "aflPercent":         integer
+        "apiKeys":         string
+        "autoAflUser":         string
+        "billingCycleEnd":         integer
+        "billingEmail":         string
+        "color":         string
+        "coverSmallUrl":         string
+        "createdBy":         string
+        "description":         string
+        "displayName":         string
+        "faviconUrl":         string
+        "gbAccountCountry":         string
+        "gbSetupStatus":         string
+        "gbStmtDesc":         string
+        "gbSupportEmail":         string
+        "initials":         string
+        "isLegacyHosting":         integer
+        "labels":         string
+        "lastNotifyAll":         integer
+        "levels":         string
+        "links":         string
+        "liveCallHandle":         string
+        "logoBigUrl":         string
+        "logoUrl":         string
+        "lpAttachmentsData":         string
+        "lpDescription":         string
+        "membership":         integer
+        "nameChanges":         integer
+        "numCourses":         integer
+        "numDraftCourses":         integer
+        "numModules":         integer
+        "onboardingVideo":         string
+        "onlineUsers":         string
+        "owner":         string
+        "paymentCard":         string
+        "paymentStatus":         string
+        "pluginAutoDmEnabled":         integer
+        "pluginMinChatLevelEnabled":         integer
+        "pluginZapierEnabled":         integer
+        "privacy":         integer
+        "selfChat":         string
+        "survey":         string
+        "surveyEnabled":         integer
+        "tabs":         string
+        "totalAdmins":         integer
+        "totalMembers":         integer
+        "totalOnlineMembers":         integer
+        "totalPosts":         integer
+        "totalReports":         integer
+        "totalRequests":         integer
+        "totalRules":         integer
+      }
+      "createdAt":       string
+      "updatedAt":       string
+      "labels":       {
+      }
+      "onlineUsers":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "pictureBubble":             string
+            "pictureProfile":             string
+            "spData":             string
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "email":           string
+          "firstName":           string
+          "lastName":           string
+        }
+      ]
+    }
+    "isMobile":     boolean
+    "isApp":     boolean
+    "userAgent":     string
+    "maintenance":     {
+    }
+    "currentPage":     {
+      "query":       {
+        "group":         string
+        "page":         string
+      }
+      "pageKey":       string
+      "path":       string
+      "isPostDetails":       boolean
+      "isChat":       boolean
+    }
+    "renderData":     {
+      "allCourses":       [
+        {
+          "id":           string
+          "name":           string
+          "metadata":           {
+            "coverImage":             string
+            "coverImageFile":             string
+            "desc":             string
+            "hasAccess":             integer
+            "minAccessLevel":             integer
+            "numModules":             integer
+            "privacy":             integer
+            "title":             string
+          }
+          "createdAt":           string
+          "updatedAt":           string
+          "unitType":           string
+          "rootId":           string
+          "userId":           string
+          "groupId":           string
+          "state":           integer
+          "public":           boolean
+        }
+      ]
+    }
+    "referer":     string
+    "host":     string
+    "growthBookData":     {
+      "features":       {
+        "hormozi_aug_2025_days_14_enabled":         {
+          "defaultValue":           boolean
+        }
+        "live_call_custom_backgrounds":         {
+          "defaultValue":           boolean
+          "rules":           [
+            {
+              "force":               boolean
+            }
+          ]
+        }
+        "enable_mux_30s_buffer":         {
+          "defaultValue":           boolean
+          "rules":           [
+            {
+              "force":               boolean
+              "coverage":               number
+              "hashAttribute":               string
+            }
+          ]
+        }
+      }
+      "experiments":       {
+      }
+    }
+    "env":     {
+      "ENV":       string
+      "CLIENT_ID_KEY":       string
+      "API_URL":       string
+      "PUBSUB_URL":       string
+      "FACEBOOK_APP_ID":       string
+      "STRIPE_PUBLISHABLE_KEY":       string
+      "BILLING_STRIPE_PUBLISHABLE_KEY":       string
+      "GIPHY_KEY":       string
+      "FB_PIXEL_ID":       string
+      "TELEMETRY_URL":       string
+      "STREAM_CLIENT_KEY":       string
+    }
+  }
+  "__N_SSP":   boolean
+}

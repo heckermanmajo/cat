@@ -1,0 +1,41 @@
+.settings-view {
+  max-width: 600px;
+}
+
+.settings-view fieldset {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
+
+.settings-view .setting-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-view .setting-row input {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settings-view .description {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.settings-view .error {
+  color: #cc0000;
+}
+
+.settings-view ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.settings-view li {
+  margin-bottom: 8px;
+}

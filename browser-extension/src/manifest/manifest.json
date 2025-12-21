@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "CatKnows",
+  "version": "0.1.0",
+  "description": "Browser extension for CatKnows local server",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "catknows@local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "cookies",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.skool.com/*",
+    "https://www.skool.com/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CatKnows"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.skool.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
