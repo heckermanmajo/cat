@@ -1,0 +1,208 @@
+/* ActivityHeatmap - Wireframe Style */
+
+.activity-heatmap {
+  padding: 12px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.activity-title {
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.timezone-select {
+  padding: 4px 8px;
+  font-size: 0.85em;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.activity-stats {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.stats-number {
+  font-size: 1.4em;
+  font-weight: 700;
+}
+
+.stats-label {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+/* Heatmap Grid */
+.heatmap-section {
+  margin-bottom: 20px;
+}
+
+.heatmap-label,
+.breakdown-label {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.heatmap-grid {
+  font-size: 0.75em;
+}
+
+.heatmap-corner {
+  display: inline-block;
+  width: 24px;
+}
+
+.heatmap-day-header {
+  display: inline-block;
+  width: calc((100% - 24px) / 7);
+  text-align: center;
+  color: var(--text-muted);
+  padding: 4px 0;
+  font-weight: 500;
+}
+
+.heatmap-row {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.heatmap-hour-label {
+  width: 24px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 4px;
+  color: var(--text-muted);
+  line-height: 14px;
+}
+
+.heatmap-cell {
+  flex: 1;
+  height: 14px;
+  background: var(--text);
+  border-radius: 1px;
+  transition: opacity 0.15s ease;
+  cursor: default;
+}
+
+.heatmap-cell:hover {
+  opacity: 1 !important;
+  outline: 1px solid var(--text);
+}
+
+/* Loading, Error, Empty States */
+.loading-state,
+.error-state,
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.error-state {
+  color: #c44;
+}
+
+.empty-state small {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85em;
+}
+
+.no-data {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Legende */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 6px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.legend-gradient {
+  width: 60px;
+  height: 10px;
+  background: linear-gradient(to right,
+    rgba(128, 128, 128, 0.1),
+    var(--text)
+  );
+  border-radius: 1px;
+}
+
+/* Daily Breakdown */
+.daily-breakdown {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-date {
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.day-name {
+  display: block;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.date-value {
+  display: block;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.breakdown-bar-container {
+  flex: 1;
+  height: 16px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  margin: 0 12px;
+}
+
+.breakdown-bar {
+  height: 100%;
+  background: var(--text);
+  opacity: 0.6;
+}
+
+.breakdown-count {
+  width: 50px;
+  text-align: right;
+  font-family: monospace;
+  font-size: 0.85em;
+  font-weight: 600;
+}

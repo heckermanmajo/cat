@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL DEFAULT 'Neuer Chat',
     report_id INTEGER,
+    archived INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE SET NULL
@@ -99,9 +100,11 @@ CREATE TABLE IF NOT EXISTS selections (
     result_ids_json TEXT DEFAULT '[]',
     created_by TEXT NOT NULL CHECK(created_by IN ('user', 'assistant')),
     message_id INTEGER,
+    parent_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL,
+    FOREIGN KEY (parent_id) REFERENCES selections(id) ON DELETE SET NULL
 );
 
 -- Report Blocks (Bausteine eines Reports)
@@ -122,5 +125,19 @@ CREATE TABLE IF NOT EXISTS report_blocks (
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_selections_message_id ON selections(message_id);
 CREATE INDEX IF NOT EXISTS idx_selections_output_type ON selections(output_type);
+CREATE INDEX IF NOT EXISTS idx_selections_parent_id ON selections(parent_id);
 CREATE INDEX IF NOT EXISTS idx_report_blocks_report_id ON report_blocks(report_id);
 CREATE INDEX IF NOT EXISTS idx_report_blocks_position ON report_blocks(report_id, position);
+
+-- Prompt Templates (wiederverwendbare Chat-Eingabe-Vorlagen)
+CREATE TABLE IF NOT EXISTS prompt_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT 'Allgemein',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_category ON prompt_templates(category);

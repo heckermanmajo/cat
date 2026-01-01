@@ -1,19 +1,56 @@
 .settings-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.settings-tabs button {
+  background: none;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9em;
+}
+
+.settings-tabs button:hover {
+  background: var(--border);
+}
+
+.settings-tabs button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.general-settings {
   max-width: 600px;
 }
 
-.settings-view fieldset {
+.general-settings fieldset {
   margin-bottom: 16px;
   border: 1px solid var(--border);
   padding: 12px;
 }
 
-.settings-view .setting-row {
+.general-settings .setting-row {
   display: flex;
   gap: 8px;
 }
 
-.settings-view .setting-row input {
+.general-settings .setting-row input {
   flex: 1;
   padding: 6px;
   border: 1px solid var(--border);
@@ -21,21 +58,21 @@
   color: var(--text);
 }
 
-.settings-view .description {
+.general-settings .description {
   margin: 8px 0 0;
   font-size: 0.9em;
   color: var(--text-muted);
 }
 
-.settings-view .error {
+.general-settings .error {
   color: #cc0000;
 }
 
-.settings-view ul {
+.general-settings ul {
   margin: 0;
   padding-left: 20px;
 }
 
-.settings-view li {
+.general-settings li {
   margin-bottom: 8px;
 }

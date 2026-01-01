@@ -43,6 +43,10 @@ func NewRouter(staticFS http.FileSystem, store *storage.Storage) http.Handler {
 		r.Get("/fetches", h.GetFetchesHandler)
 		r.Options("/fetches", h.GetFetchesHandler)
 
+		// Posts endpoints - extrahierte Posts aus Fetches
+		r.Get("/posts", h.GetPostsHandler)
+		r.Options("/posts", h.GetPostsHandler)
+
 		// Fetch Queue endpoints - für die Browser Extension
 		r.Get("/fetch-queue", h.GetFetchQueueHandler)
 		r.Post("/fetch-queue", h.GetFetchQueueHandler)
@@ -64,8 +68,17 @@ func NewRouter(staticFS http.FileSystem, store *storage.Storage) http.Handler {
 		r.Post("/chats", h.CreateChatHandler)
 		r.Get("/chat", h.GetChatHandler)
 		r.Options("/chat", h.GetChatHandler)
+		r.Put("/chat", h.UpdateChatHandler)
 		r.Delete("/chat", h.DeleteChatHandler)
 		r.Options("/chat", h.DeleteChatHandler)
+		r.Post("/chat/archive", h.ArchiveChatHandler)
+		r.Options("/chat/archive", h.ArchiveChatHandler)
+
+		// Chat Report endpoints (lazy report creation + AI condensation)
+		r.Post("/chat/add-to-report", h.AddSelectionToReportHandler)
+		r.Options("/chat/add-to-report", h.AddSelectionToReportHandler)
+		r.Get("/chat/report", h.GetChatReportHandler)
+		r.Options("/chat/report", h.GetChatReportHandler)
 
 		// Message endpoints
 		r.Get("/messages", h.GetMessagesHandler)
@@ -79,8 +92,13 @@ func NewRouter(staticFS http.FileSystem, store *storage.Storage) http.Handler {
 		r.Post("/selections", h.CreateSelectionHandler)
 		r.Get("/selection", h.GetSelectionHandler)
 		r.Options("/selection", h.GetSelectionHandler)
+		r.Put("/selection", h.UpdateSelectionHandler)
+		r.Options("/selection", h.UpdateSelectionHandler)
 		r.Delete("/selection", h.DeleteSelectionHandler)
-		r.Options("/selection", h.DeleteSelectionHandler)
+		r.Get("/selection/execute", h.ExecuteSelectionHandler)
+		r.Options("/selection/execute", h.ExecuteSelectionHandler)
+		r.Post("/selection/duplicate", h.DuplicateSelectionHandler)
+		r.Options("/selection/duplicate", h.DuplicateSelectionHandler)
 
 		// Report endpoints (enhanced)
 		r.Get("/reports", h.GetReportsHandler)
@@ -102,6 +120,22 @@ func NewRouter(staticFS http.FileSystem, store *storage.Storage) http.Handler {
 		r.Options("/schema", h.GetSchemaHandler)
 		r.Get("/table-data", h.GetTableDataHandler)
 		r.Options("/table-data", h.GetTableDataHandler)
+
+		// Activity & Connection endpoints - fuer Visualisierungen
+		r.Get("/activity", h.GetActivityHandler)
+		r.Options("/activity", h.GetActivityHandler)
+		r.Get("/connections", h.GetConnectionsHandler)
+		r.Options("/connections", h.GetConnectionsHandler)
+
+		// Prompt Template endpoints
+		r.Get("/prompt-templates", h.GetPromptTemplatesHandler)
+		r.Options("/prompt-templates", h.GetPromptTemplatesHandler)
+		r.Post("/prompt-templates", h.CreatePromptTemplateHandler)
+		r.Get("/prompt-template", h.GetPromptTemplateHandler)
+		r.Options("/prompt-template", h.GetPromptTemplateHandler)
+		r.Put("/prompt-template", h.UpdatePromptTemplateHandler)
+		r.Options("/prompt-template", h.UpdatePromptTemplateHandler)
+		r.Delete("/prompt-template", h.DeletePromptTemplateHandler)
 	})
 
 	// Static files (Frontend) - SPA handler

@@ -98,7 +98,7 @@ type ErrorResponse struct {
 
 // Chat sendet eine Chat-Anfrage an die AI
 func (c *Client) Chat(ctx context.Context, messages []Message) (*ChatResponse, error) {
-	return c.ChatWithOptions(ctx, messages, 0.7, 1000)
+	return c.ChatWithOptions(ctx, messages, 0.7, 4000)
 }
 
 // ChatWithOptions sendet eine Chat-Anfrage mit Optionen

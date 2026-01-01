@@ -38,6 +38,18 @@
   flex: 1;
 }
 
+.nav-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px !important;
+  border-radius: 4px;
+}
+
+.nav-settings svg {
+  display: block;
+}
+
 .content {
   flex: 1;
   padding: 16px;

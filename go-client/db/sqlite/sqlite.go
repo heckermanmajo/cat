@@ -27,6 +27,13 @@ func Connect(dbPath string) (*AppDB, error) {
 		return nil, err
 	}
 
+	// Migration VOR dem Schema: parent_id Spalte hinzufuegen falls nicht vorhanden
+	// (ignoriert Fehler wenn Spalte schon existiert oder Tabelle noch nicht existiert)
+	db.Exec("ALTER TABLE selections ADD COLUMN parent_id INTEGER REFERENCES selections(id) ON DELETE SET NULL")
+
+	// Migration: archived Spalte zu chats hinzufügen falls nicht vorhanden
+	db.Exec("ALTER TABLE chats ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("sqlite schema error: %w", err)
 	}
@@ -403,6 +410,7 @@ type Chat struct {
 	ID        int64     `json:"id"`
 	Title     string    `json:"title"`
 	ReportID  *int64    `json:"reportId,omitempty"`
+	Archived  bool      `json:"archived"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -423,9 +431,10 @@ func (a *AppDB) CreateChat(title string) (int64, error) {
 func (a *AppDB) GetChat(id int64) (*Chat, error) {
 	var c Chat
 	var reportID sql.NullInt64
+	var archived int
 	err := a.db.QueryRow(`
-		SELECT id, title, report_id, created_at, updated_at FROM chats WHERE id = ?
-	`, id).Scan(&c.ID, &c.Title, &reportID, &c.CreatedAt, &c.UpdatedAt)
+		SELECT id, title, report_id, archived, created_at, updated_at FROM chats WHERE id = ?
+	`, id).Scan(&c.ID, &c.Title, &reportID, &archived, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -435,14 +444,27 @@ func (a *AppDB) GetChat(id int64) (*Chat, error) {
 	if reportID.Valid {
 		c.ReportID = &reportID.Int64
 	}
+	c.Archived = archived == 1
 	return &c, nil
 }
 
-func (a *AppDB) GetAllChats() ([]Chat, error) {
-	rows, err := a.db.Query(`
-		SELECT id, title, report_id, created_at, updated_at
-		FROM chats ORDER BY updated_at DESC
-	`)
+// GetAllChats returns all chats, optionally filtered by archived status
+// If archived is nil, returns all chats. If true, only archived. If false, only non-archived.
+func (a *AppDB) GetAllChats(archived *bool) ([]Chat, error) {
+	query := `SELECT id, title, report_id, archived, created_at, updated_at FROM chats`
+	args := []interface{}{}
+
+	if archived != nil {
+		query += " WHERE archived = ?"
+		if *archived {
+			args = append(args, 1)
+		} else {
+			args = append(args, 0)
+		}
+	}
+	query += " ORDER BY updated_at DESC"
+
+	rows, err := a.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -452,12 +474,14 @@ func (a *AppDB) GetAllChats() ([]Chat, error) {
 	for rows.Next() {
 		var c Chat
 		var reportID sql.NullInt64
-		if err := rows.Scan(&c.ID, &c.Title, &reportID, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var archivedInt int
+		if err := rows.Scan(&c.ID, &c.Title, &reportID, &archivedInt, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if reportID.Valid {
 			c.ReportID = &reportID.Int64
 		}
+		c.Archived = archivedInt == 1
 		chats = append(chats, c)
 	}
 	return chats, rows.Err()
@@ -470,8 +494,30 @@ func (a *AppDB) UpdateChatTitle(id int64, title string) error {
 	return err
 }
 
+func (a *AppDB) ArchiveChat(id int64) error {
+	_, err := a.db.Exec(`
+		UPDATE chats SET archived = 1, updated_at = ? WHERE id = ?
+	`, time.Now(), id)
+	return err
+}
+
+func (a *AppDB) UnarchiveChat(id int64) error {
+	_, err := a.db.Exec(`
+		UPDATE chats SET archived = 0, updated_at = ? WHERE id = ?
+	`, time.Now(), id)
+	return err
+}
+
 func (a *AppDB) DeleteChat(id int64) error {
 	_, err := a.db.Exec("DELETE FROM chats WHERE id = ?", id)
+	return err
+}
+
+// SetChatReportID links a report to a chat (for lazy report creation)
+func (a *AppDB) SetChatReportID(chatID, reportID int64) error {
+	_, err := a.db.Exec(`
+		UPDATE chats SET report_id = ?, updated_at = ? WHERE id = ?
+	`, reportID, time.Now(), chatID)
 	return err
 }
 
@@ -531,15 +577,20 @@ type Selection struct {
 	ResultIDsJSON string    `json:"resultIdsJson"`
 	CreatedBy     string    `json:"createdBy"`
 	MessageID     *int64    `json:"messageId,omitempty"`
+	ParentID      *int64    `json:"parentId,omitempty"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 func (a *AppDB) CreateSelection(name, outputType, filtersJSON, createdBy string, messageID *int64) (int64, error) {
+	return a.CreateSelectionWithParent(name, outputType, filtersJSON, createdBy, messageID, nil)
+}
+
+func (a *AppDB) CreateSelectionWithParent(name, outputType, filtersJSON, createdBy string, messageID *int64, parentID *int64) (int64, error) {
 	result, err := a.db.Exec(`
-		INSERT INTO selections (name, output_type, filters_json, created_by, message_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, name, outputType, filtersJSON, createdBy, messageID, time.Now(), time.Now())
+		INSERT INTO selections (name, output_type, filters_json, created_by, message_id, parent_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, name, outputType, filtersJSON, createdBy, messageID, parentID, time.Now(), time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -548,11 +599,11 @@ func (a *AppDB) CreateSelection(name, outputType, filtersJSON, createdBy string,
 
 func (a *AppDB) GetSelection(id int64) (*Selection, error) {
 	var s Selection
-	var messageID sql.NullInt64
+	var messageID, parentID sql.NullInt64
 	err := a.db.QueryRow(`
-		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, created_at, updated_at
+		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, parent_id, created_at, updated_at
 		FROM selections WHERE id = ?
-	`, id).Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &messageID, &s.CreatedAt, &s.UpdatedAt)
+	`, id).Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &messageID, &parentID, &s.CreatedAt, &s.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -562,13 +613,16 @@ func (a *AppDB) GetSelection(id int64) (*Selection, error) {
 	if messageID.Valid {
 		s.MessageID = &messageID.Int64
 	}
+	if parentID.Valid {
+		s.ParentID = &parentID.Int64
+	}
 	return &s, nil
 }
 
 func (a *AppDB) GetSelectionsByMessage(messageID int64) ([]Selection, error) {
 	rows, err := a.db.Query(`
-		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, created_at, updated_at
-		FROM selections WHERE message_id = ? ORDER BY created_at ASC
+		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, parent_id, created_at, updated_at
+		FROM selections WHERE message_id = ? AND parent_id IS NULL ORDER BY created_at ASC
 	`, messageID)
 	if err != nil {
 		return nil, err
@@ -578,12 +632,44 @@ func (a *AppDB) GetSelectionsByMessage(messageID int64) ([]Selection, error) {
 	var selections []Selection
 	for rows.Next() {
 		var s Selection
-		var msgID sql.NullInt64
-		if err := rows.Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &msgID, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		var msgID, parentID sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &msgID, &parentID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if msgID.Valid {
 			s.MessageID = &msgID.Int64
+		}
+		if parentID.Valid {
+			s.ParentID = &parentID.Int64
+		}
+		selections = append(selections, s)
+	}
+	return selections, rows.Err()
+}
+
+// GetDerivedSelections holt alle von einer Selection abgeleiteten Selektionen
+func (a *AppDB) GetDerivedSelections(parentID int64) ([]Selection, error) {
+	rows, err := a.db.Query(`
+		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, parent_id, created_at, updated_at
+		FROM selections WHERE parent_id = ? ORDER BY created_at ASC
+	`, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var selections []Selection
+	for rows.Next() {
+		var s Selection
+		var msgID, pID sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &msgID, &pID, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if msgID.Valid {
+			s.MessageID = &msgID.Int64
+		}
+		if pID.Valid {
+			s.ParentID = &pID.Int64
 		}
 		selections = append(selections, s)
 	}
@@ -592,7 +678,7 @@ func (a *AppDB) GetSelectionsByMessage(messageID int64) ([]Selection, error) {
 
 func (a *AppDB) GetAllSelections() ([]Selection, error) {
 	rows, err := a.db.Query(`
-		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, created_at, updated_at
+		SELECT id, name, output_type, filters_json, result_count, result_ids_json, created_by, message_id, parent_id, created_at, updated_at
 		FROM selections ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -603,12 +689,15 @@ func (a *AppDB) GetAllSelections() ([]Selection, error) {
 	var selections []Selection
 	for rows.Next() {
 		var s Selection
-		var msgID sql.NullInt64
-		if err := rows.Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &msgID, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		var msgID, parentID sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.Name, &s.OutputType, &s.FiltersJSON, &s.ResultCount, &s.ResultIDsJSON, &s.CreatedBy, &msgID, &parentID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if msgID.Valid {
 			s.MessageID = &msgID.Int64
+		}
+		if parentID.Valid {
+			s.ParentID = &parentID.Int64
 		}
 		selections = append(selections, s)
 	}
@@ -619,6 +708,13 @@ func (a *AppDB) UpdateSelectionResults(id int64, resultCount int, resultIDsJSON 
 	_, err := a.db.Exec(`
 		UPDATE selections SET result_count = ?, result_ids_json = ?, updated_at = ? WHERE id = ?
 	`, resultCount, resultIDsJSON, time.Now(), id)
+	return err
+}
+
+func (a *AppDB) UpdateSelection(id int64, name, outputType, filtersJSON string) error {
+	_, err := a.db.Exec(`
+		UPDATE selections SET name = ?, output_type = ?, filters_json = ?, result_count = 0, result_ids_json = '[]', updated_at = ? WHERE id = ?
+	`, name, outputType, filtersJSON, time.Now(), id)
 	return err
 }
 
@@ -735,4 +831,120 @@ func (a *AppDB) GetAllReports() ([]Report, error) {
 func (a *AppDB) DeleteReport(id int64) error {
 	_, err := a.db.Exec("DELETE FROM reports WHERE id = ?", id)
 	return err
+}
+
+// === Prompt Templates ===
+
+type PromptTemplate struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Content     string    `json:"content"`
+	Description string    `json:"description"`
+	Category    string    `json:"category"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func (a *AppDB) CreatePromptTemplate(name, content, description, category string) (int64, error) {
+	if category == "" {
+		category = "Allgemein"
+	}
+	result, err := a.db.Exec(`
+		INSERT INTO prompt_templates (name, content, description, category, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, name, content, description, category, time.Now(), time.Now())
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+func (a *AppDB) GetPromptTemplate(id int64) (*PromptTemplate, error) {
+	var t PromptTemplate
+	err := a.db.QueryRow(`
+		SELECT id, name, content, COALESCE(description, ''), COALESCE(category, 'Allgemein'), created_at, updated_at
+		FROM prompt_templates WHERE id = ?
+	`, id).Scan(&t.ID, &t.Name, &t.Content, &t.Description, &t.Category, &t.CreatedAt, &t.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (a *AppDB) GetAllPromptTemplates() ([]PromptTemplate, error) {
+	rows, err := a.db.Query(`
+		SELECT id, name, content, COALESCE(description, ''), COALESCE(category, 'Allgemein'), created_at, updated_at
+		FROM prompt_templates ORDER BY category ASC, name ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var templates []PromptTemplate
+	for rows.Next() {
+		var t PromptTemplate
+		if err := rows.Scan(&t.ID, &t.Name, &t.Content, &t.Description, &t.Category, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		templates = append(templates, t)
+	}
+	return templates, rows.Err()
+}
+
+func (a *AppDB) GetPromptTemplatesByCategory(category string) ([]PromptTemplate, error) {
+	rows, err := a.db.Query(`
+		SELECT id, name, content, COALESCE(description, ''), COALESCE(category, 'Allgemein'), created_at, updated_at
+		FROM prompt_templates WHERE category = ? ORDER BY name ASC
+	`, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var templates []PromptTemplate
+	for rows.Next() {
+		var t PromptTemplate
+		if err := rows.Scan(&t.ID, &t.Name, &t.Content, &t.Description, &t.Category, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		templates = append(templates, t)
+	}
+	return templates, rows.Err()
+}
+
+func (a *AppDB) UpdatePromptTemplate(id int64, name, content, description, category string) error {
+	if category == "" {
+		category = "Allgemein"
+	}
+	_, err := a.db.Exec(`
+		UPDATE prompt_templates SET name = ?, content = ?, description = ?, category = ?, updated_at = ? WHERE id = ?
+	`, name, content, description, category, time.Now(), id)
+	return err
+}
+
+func (a *AppDB) DeletePromptTemplate(id int64) error {
+	_, err := a.db.Exec("DELETE FROM prompt_templates WHERE id = ?", id)
+	return err
+}
+
+func (a *AppDB) GetPromptTemplateCategories() ([]string, error) {
+	rows, err := a.db.Query("SELECT DISTINCT category FROM prompt_templates ORDER BY category ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			return nil, err
+		}
+		categories = append(categories, c)
+	}
+	return categories, rows.Err()
 }

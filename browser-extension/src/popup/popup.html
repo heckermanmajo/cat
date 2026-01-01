@@ -17,7 +17,17 @@
       gap: 8px;
     }
     h3::before {
-      content: "🐱";
+      content: "C";
+      background: #8b5cf6;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
     }
     .section {
       background: #f3f4f6;
@@ -78,7 +88,7 @@
       text-transform: uppercase;
     }
     .queue-list {
-      max-height: 200px;
+      max-height: 150px;
       overflow-y: auto;
     }
     .queue-item {
@@ -92,7 +102,11 @@
       font-size: 12px;
     }
     .queue-item .type-icon {
-      font-size: 14px;
+      font-size: 11px;
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
     }
     .queue-item .type-name {
       flex: 1;
@@ -137,6 +151,205 @@
       text-align: center;
     }
 
+    /* Fetch Log */
+    .fetch-log-section {
+      display: none;
+      margin-top: 12px;
+    }
+    .fetch-log-list {
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      border-radius: 4px;
+    }
+    .log-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .log-item:last-child {
+      border-bottom: none;
+    }
+    .log-item .log-icon {
+      background: #e5e7eb;
+      padding: 2px 5px;
+      border-radius: 2px;
+      font-weight: bold;
+      font-size: 10px;
+    }
+    .log-item .log-type {
+      font-weight: 500;
+      min-width: 60px;
+    }
+    .log-item .log-details {
+      flex: 1;
+      color: #6b7280;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .log-item .log-duration {
+      color: #8b5cf6;
+      font-weight: 500;
+      min-width: 40px;
+      text-align: right;
+    }
+    .log-item .log-status {
+      font-weight: bold;
+      width: 20px;
+      text-align: center;
+    }
+    .log-item.success .log-status { color: #10b981; }
+    .log-item.error .log-status { color: #ef4444; }
+    .log-item.skipped .log-status { color: #9ca3af; }
+    .log-error-detail {
+      background: #fef2f2;
+      border-left: 3px solid #ef4444;
+      padding: 6px 8px;
+      margin: 2px 0 4px 0;
+      font-size: 10px;
+      color: #991b1b;
+      word-break: break-word;
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+    .log-empty {
+      text-align: center;
+      padding: 15px;
+      color: #9ca3af;
+      font-size: 12px;
+    }
+
+    /* Current Task */
+    .current-task {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+    .current-task.idle {
+      background: #f3f4f6;
+      border-color: #e5e7eb;
+    }
+    .current-task .task-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .current-task .task-status {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .current-task .task-status.running {
+      background: #10b981;
+      color: white;
+    }
+    .current-task .task-status.idle {
+      background: #9ca3af;
+      color: white;
+    }
+    .current-task .task-type {
+      font-weight: 600;
+      color: #1e40af;
+    }
+    .current-task.idle .task-type {
+      color: #6b7280;
+    }
+    .current-task .task-details {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .current-task .task-progress {
+      font-size: 10px;
+      color: #3b82f6;
+      font-weight: 500;
+    }
+
+    /* Debug Log Section */
+    .debug-log-section {
+      display: none;
+      margin-top: 12px;
+    }
+    .debug-log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .debug-log-list {
+      max-height: 250px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 10px;
+    }
+    .debug-entry {
+      padding: 3px 0;
+      border-bottom: 1px solid #333;
+      display: flex;
+      gap: 6px;
+    }
+    .debug-entry:last-child {
+      border-bottom: none;
+    }
+    .debug-entry .debug-time {
+      color: #6b7280;
+      min-width: 60px;
+    }
+    .debug-entry .debug-level {
+      min-width: 50px;
+      font-weight: bold;
+      padding: 0 4px;
+      border-radius: 2px;
+    }
+    .debug-entry .debug-level.info { color: #60a5fa; }
+    .debug-entry .debug-level.warn { color: #fbbf24; }
+    .debug-entry .debug-level.error { color: #f87171; }
+    .debug-entry .debug-level.success { color: #34d399; }
+    .debug-entry .debug-message {
+      color: #e5e7eb;
+      flex: 1;
+      word-break: break-word;
+    }
+    .debug-entry .debug-details {
+      color: #9ca3af;
+      font-size: 9px;
+      margin-top: 2px;
+      padding-left: 116px;
+    }
+
+    /* Error Banner */
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .error-banner.visible {
+      display: block;
+    }
+    .error-banner .error-title {
+      color: #dc2626;
+      font-weight: 600;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .error-banner .error-message {
+      color: #991b1b;
+      font-size: 11px;
+    }
+
     /* Buttons */
     button {
       padding: 10px 15px;
@@ -172,6 +385,10 @@
     }
     .btn-danger:hover:not(:disabled) {
       background-color: #fecaca;
+    }
+    .btn-small {
+      padding: 6px 10px;
+      font-size: 11px;
     }
     .btn-row {
       display: flex;
@@ -228,6 +445,22 @@
 <body>
   <h3>CatKnows</h3>
 
+  <!-- Error Banner -->
+  <div class="error-banner" id="errorBanner">
+    <div class="error-title" id="errorTitle">Fehler</div>
+    <div class="error-message" id="errorMessage"></div>
+  </div>
+
+  <!-- Current Task -->
+  <div class="current-task idle" id="currentTaskSection">
+    <div class="task-header">
+      <span class="task-status idle" id="taskStatus">Idle</span>
+      <span class="task-type" id="taskType">Warte auf Start...</span>
+    </div>
+    <div class="task-details" id="taskDetails"></div>
+    <div class="task-progress" id="taskProgress"></div>
+  </div>
+
   <!-- Current Page -->
   <div class="section current-page">
     <div class="section-title">Current Community</div>
@@ -273,7 +506,36 @@
   <button class="btn-primary" id="startQueueBtn" disabled>Process Queue</button>
   <div class="btn-row">
     <button class="btn-secondary" id="stopQueueBtn" disabled>Stop</button>
-    <button class="btn-danger" id="clearCacheBtn">Clear Cache</button>
+    <button class="btn-secondary" id="checkNowBtn">Check Now</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary btn-small" id="toggleLogBtn">Fetch-Log</button>
+    <button class="btn-secondary btn-small" id="toggleDebugBtn">Debug</button>
+    <button class="btn-danger btn-small" id="clearCacheBtn">Clear</button>
+    <button class="btn-danger btn-small" id="forceResetBtn">Reset</button>
+  </div>
+
+  <!-- Fetch Log Section -->
+  <div class="fetch-log-section" id="fetchLogSection">
+    <div class="section">
+      <div class="section-title">Fetch Log</div>
+      <div class="fetch-log-list" id="fetchLogList">
+        <div class="log-empty">Keine Fetches bisher</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Log Section -->
+  <div class="debug-log-section" id="debugLogSection">
+    <div class="section">
+      <div class="debug-log-header">
+        <div class="section-title">Debug Log</div>
+        <button class="btn-danger btn-small" id="clearDebugBtn" style="padding: 4px 8px; font-size: 10px;">Clear</button>
+      </div>
+      <div class="debug-log-list" id="debugLogList">
+        <div class="log-empty" style="color: #6b7280;">Kein Debug-Log vorhanden</div>
+      </div>
+    </div>
   </div>
 
   <div id="status"></div>

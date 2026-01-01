@@ -89,6 +89,7 @@ type LogEntry struct {
 // === Handlers ===
 
 func (h *Handlers) HelloHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
 	resp := HelloResponse{
 		Message: "Hello from CatKnows local backend!",
 	}
@@ -576,11 +577,41 @@ func (h *Handlers) GetFetchesHandler(w http.ResponseWriter, r *http.Request) {
 // === Fetch Queue Handlers ===
 
 type FetchQueueRequest struct {
-	CommunityIDs []string `json:"communityIds"`
+	CommunityIDs []string           `json:"communityIds"`
+	Options      *FetchQueueOptions `json:"options,omitempty"`
+}
+
+// FetchQueueOptions enthält die konfigurierbaren Fetch-Optionen
+type FetchQueueOptions struct {
+	FetchPostLikes           *bool `json:"fetchPostLikes,omitempty"`
+	FetchPostComments        *bool `json:"fetchPostComments,omitempty"`
+	FetchMemberProfiles      *bool `json:"fetchMemberProfiles,omitempty"`
+	FetchSharedCommunities   *bool `json:"fetchSharedCommunities,omitempty"`
+	MinSharedMembersForFetch *int  `json:"minSharedMembersForFetch,omitempty"`
+	RefreshIntervalHours     *int  `json:"refreshIntervalHours,omitempty"`
+	MaxTasksPerType          *int  `json:"maxTasksPerType,omitempty"`
+}
+
+// FetchQueueResponse erweitert die Queue um die verwendeten Optionen
+type FetchQueueResponse struct {
+	*fetchqueue.FetchQueue
+	UsedOptions FetchQueueOptionsResponse `json:"usedOptions"`
+}
+
+// FetchQueueOptionsResponse zeigt die tatsächlich verwendeten Optionen
+type FetchQueueOptionsResponse struct {
+	FetchPostLikes           bool `json:"fetchPostLikes"`
+	FetchPostComments        bool `json:"fetchPostComments"`
+	FetchMemberProfiles      bool `json:"fetchMemberProfiles"`
+	FetchSharedCommunities   bool `json:"fetchSharedCommunities"`
+	MinSharedMembersForFetch int  `json:"minSharedMembersForFetch"`
+	RefreshIntervalHours     int  `json:"refreshIntervalHours"`
+	MaxTasksPerType          int  `json:"maxTasksPerType"`
 }
 
 // GetFetchQueueHandler generiert die aktuelle Fetch-Queue
 // Die Queue wird bei jedem Aufruf neu berechnet basierend auf dem Datenstand
+// Akzeptiert optionale Konfigurationsparameter über Query-String oder JSON-Body
 func (h *Handlers) GetFetchQueueHandler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w)
 
@@ -589,19 +620,26 @@ func (h *Handlers) GetFetchQueueHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Community IDs aus Query oder Body
+	// Community IDs und Optionen aus Query oder Body
 	var communityIDs []string
+	var options *FetchQueueOptions
 
 	if r.Method == "POST" {
 		var req FetchQueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 			communityIDs = req.CommunityIDs
+			options = req.Options
 		}
 	} else {
-		// GET: Community IDs aus Query Parameter (komma-separiert)
-		if ids := r.URL.Query().Get("communityIds"); ids != "" {
+		// GET: Parameter aus Query String
+		query := r.URL.Query()
+
+		if ids := query.Get("communityIds"); ids != "" {
 			communityIDs = strings.Split(ids, ",")
 		}
+
+		// Optionen aus Query-Parametern parsen
+		options = parseOptionsFromQuery(query)
 	}
 
 	if len(communityIDs) == 0 {
@@ -609,8 +647,34 @@ func (h *Handlers) GetFetchQueueHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Queue Builder erstellen und Queue generieren
+	// Queue Builder erstellen mit Standardconfig
 	config := fetchqueue.DefaultConfig()
+
+	// Optionen anwenden falls vorhanden
+	if options != nil {
+		if options.FetchPostLikes != nil {
+			config.FetchPostLikes = *options.FetchPostLikes
+		}
+		if options.FetchPostComments != nil {
+			config.FetchPostComments = *options.FetchPostComments
+		}
+		if options.FetchMemberProfiles != nil {
+			config.FetchMemberProfiles = *options.FetchMemberProfiles
+		}
+		if options.FetchSharedCommunities != nil {
+			config.FetchSharedCommunities = *options.FetchSharedCommunities
+		}
+		if options.MinSharedMembersForFetch != nil {
+			config.MinSharedMembersForFetch = *options.MinSharedMembersForFetch
+		}
+		if options.RefreshIntervalHours != nil {
+			config.RefreshInterval = time.Duration(*options.RefreshIntervalHours) * time.Hour
+		}
+		if options.MaxTasksPerType != nil {
+			config.MaxTasksPerType = *options.MaxTasksPerType
+		}
+	}
+
 	builder := fetchqueue.NewQueueBuilder(h.storage.Raw, config)
 
 	queue, err := builder.BuildQueue(communityIDs)
@@ -620,16 +684,80 @@ func (h *Handlers) GetFetchQueueHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, queue)
+	// Response mit verwendeten Optionen
+	response := FetchQueueResponse{
+		FetchQueue: queue,
+		UsedOptions: FetchQueueOptionsResponse{
+			FetchPostLikes:           config.FetchPostLikes,
+			FetchPostComments:        config.FetchPostComments,
+			FetchMemberProfiles:      config.FetchMemberProfiles,
+			FetchSharedCommunities:   config.FetchSharedCommunities,
+			MinSharedMembersForFetch: config.MinSharedMembersForFetch,
+			RefreshIntervalHours:     int(config.RefreshInterval.Hours()),
+			MaxTasksPerType:          config.MaxTasksPerType,
+		},
+	}
+
+	writeJSON(w, response)
+}
+
+// parseOptionsFromQuery parst Fetch-Optionen aus Query-Parametern
+func parseOptionsFromQuery(query map[string][]string) *FetchQueueOptions {
+	options := &FetchQueueOptions{}
+	hasOptions := false
+
+	if v := query["fetchPostLikes"]; len(v) > 0 {
+		val := v[0] == "true" || v[0] == "1"
+		options.FetchPostLikes = &val
+		hasOptions = true
+	}
+	if v := query["fetchPostComments"]; len(v) > 0 {
+		val := v[0] == "true" || v[0] == "1"
+		options.FetchPostComments = &val
+		hasOptions = true
+	}
+	if v := query["fetchMemberProfiles"]; len(v) > 0 {
+		val := v[0] == "true" || v[0] == "1"
+		options.FetchMemberProfiles = &val
+		hasOptions = true
+	}
+	if v := query["fetchSharedCommunities"]; len(v) > 0 {
+		val := v[0] == "true" || v[0] == "1"
+		options.FetchSharedCommunities = &val
+		hasOptions = true
+	}
+	if v := query["minSharedMembersForFetch"]; len(v) > 0 {
+		if val, err := strconv.Atoi(v[0]); err == nil {
+			options.MinSharedMembersForFetch = &val
+			hasOptions = true
+		}
+	}
+	if v := query["refreshIntervalHours"]; len(v) > 0 {
+		if val, err := strconv.Atoi(v[0]); err == nil {
+			options.RefreshIntervalHours = &val
+			hasOptions = true
+		}
+	}
+	if v := query["maxTasksPerType"]; len(v) > 0 {
+		if val, err := strconv.Atoi(v[0]); err == nil {
+			options.MaxTasksPerType = &val
+			hasOptions = true
+		}
+	}
+
+	if !hasOptions {
+		return nil
+	}
+	return options
 }
 
 // === Data View Handlers ===
 
 // TableInfo enthält Informationen über eine Tabelle
 type TableInfo struct {
-	Name    string        `json:"name"`
-	Type    string        `json:"type"`
-	Columns []ColumnInfo  `json:"columns"`
+	Name     string       `json:"name"`
+	Type     string       `json:"type"`
+	Columns  []ColumnInfo `json:"columns"`
 	RowCount int64        `json:"rowCount"`
 }
 
@@ -640,8 +768,8 @@ type ColumnInfo struct {
 }
 
 type SchemaResponse struct {
-	DuckDB  []TableInfo `json:"duckdb"`
-	SQLite  []TableInfo `json:"sqlite"`
+	DuckDB []TableInfo `json:"duckdb"`
+	SQLite []TableInfo `json:"sqlite"`
 }
 
 type TableDataResponse struct {
@@ -911,12 +1039,12 @@ func (h *Handlers) GetTableDataHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "chats":
-			chats, err := h.storage.App.GetAllChats()
+			chats, err := h.storage.App.GetAllChats(nil)
 			if err != nil {
 				writeError(w, "Failed to get data: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-			resp.Columns = []string{"id", "title", "report_id", "created_at", "updated_at"}
+			resp.Columns = []string{"id", "title", "report_id", "archived", "created_at", "updated_at"}
 			resp.Total = int64(len(chats))
 			resp.Rows = make([][]interface{}, len(chats))
 			for i, c := range chats {
@@ -924,7 +1052,7 @@ func (h *Handlers) GetTableDataHandler(w http.ResponseWriter, r *http.Request) {
 				if c.ReportID != nil {
 					reportID = *c.ReportID
 				}
-				resp.Rows[i] = []interface{}{c.ID, c.Title, reportID, c.CreatedAt.Format(time.RFC3339), c.UpdatedAt.Format(time.RFC3339)}
+				resp.Rows[i] = []interface{}{c.ID, c.Title, reportID, c.Archived, c.CreatedAt.Format(time.RFC3339), c.UpdatedAt.Format(time.RFC3339)}
 			}
 
 		case "reports":
@@ -983,6 +1111,141 @@ func (h *Handlers) GetTableDataHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
+// === Posts Handlers ===
+
+type PostsResponse struct {
+	Posts []duckdb.Post `json:"posts"`
+	Total int64         `json:"total"`
+}
+
+// GetPostsHandler gibt extrahierte Posts aus den Fetches zurück
+func (h *Handlers) GetPostsHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Filter-Parameter aus Query
+	filter := duckdb.PostFilter{}
+
+	if communityIDs := r.URL.Query().Get("communityIds"); communityIDs != "" {
+		filter.CommunityIDs = strings.Split(communityIDs, ",")
+	}
+	if authorID := r.URL.Query().Get("authorId"); authorID != "" {
+		filter.AuthorID = authorID
+	}
+	if likesMin := r.URL.Query().Get("likesMin"); likesMin != "" {
+		if l, err := strconv.Atoi(likesMin); err == nil {
+			filter.LikesMin = l
+		}
+	}
+	if createdAfter := r.URL.Query().Get("createdAfter"); createdAfter != "" {
+		filter.CreatedAfter = createdAfter
+	}
+	if createdBefore := r.URL.Query().Get("createdBefore"); createdBefore != "" {
+		filter.CreatedBefore = createdBefore
+	}
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil {
+			filter.Limit = l
+		}
+	}
+	if offset := r.URL.Query().Get("offset"); offset != "" {
+		if o, err := strconv.Atoi(offset); err == nil {
+			filter.Offset = o
+		}
+	}
+	if includeRaw := r.URL.Query().Get("includeRaw"); includeRaw == "true" {
+		filter.IncludeRaw = true
+	}
+
+	// Default limit
+	if filter.Limit == 0 {
+		filter.Limit = 50
+	}
+
+	posts, total, err := h.storage.Raw.GetPosts(filter)
+	if err != nil {
+		log.Printf("Error getting posts: %v", err)
+		writeError(w, "Failed to get posts: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if posts == nil {
+		posts = []duckdb.Post{}
+	}
+
+	writeJSON(w, PostsResponse{
+		Posts: posts,
+		Total: total,
+	})
+}
+
+// === Activity & Connection Handlers ===
+
+// GetActivityHandler gibt Aktivitaetsdaten fuer die Heatmap zurueck
+func (h *Handlers) GetActivityHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Parameter
+	timezone := r.URL.Query().Get("timezone")
+	if timezone == "" {
+		timezone = "Europe/Berlin"
+	}
+
+	days := 7
+	if d := r.URL.Query().Get("days"); d != "" {
+		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 && parsed <= 30 {
+			days = parsed
+		}
+	}
+
+	var communityIDs []string
+	if ids := r.URL.Query().Get("communityIds"); ids != "" {
+		communityIDs = strings.Split(ids, ",")
+	}
+
+	data, err := h.storage.Raw.GetMemberActivity(communityIDs, timezone, days)
+	if err != nil {
+		log.Printf("Error getting activity data: %v", err)
+		writeError(w, "Failed to get activity data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, data)
+}
+
+// GetConnectionsHandler gibt Verbindungsdaten fuer den Graph zurueck
+func (h *Handlers) GetConnectionsHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var communityIDs []string
+	if ids := r.URL.Query().Get("communityIds"); ids != "" {
+		communityIDs = strings.Split(ids, ",")
+	}
+
+	data, err := h.storage.Raw.GetMemberConnections(communityIDs)
+	if err != nil {
+		log.Printf("Error getting connections data: %v", err)
+		writeError(w, "Failed to get connections data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, data)
+}
+
 // GetNextFetchHandler gibt den nächsten Fetch-Task zurück
 // Praktisch für die Extension um einen Task nach dem anderen abzuarbeiten
 func (h *Handlers) GetNextFetchHandler(w http.ResponseWriter, r *http.Request) {
@@ -1018,8 +1281,8 @@ func (h *Handlers) GetNextFetchHandler(w http.ResponseWriter, r *http.Request) {
 	// Ersten Task zurückgeben oder leere Response
 	if len(queue.Tasks) > 0 {
 		writeJSON(w, map[string]interface{}{
-			"hasNext": true,
-			"task":    queue.Tasks[0],
+			"hasNext":   true,
+			"task":      queue.Tasks[0],
 			"remaining": len(queue.Tasks) - 1,
 		})
 	} else {
@@ -1029,4 +1292,207 @@ func (h *Handlers) GetNextFetchHandler(w http.ResponseWriter, r *http.Request) {
 			"remaining": 0,
 		})
 	}
+}
+
+// === Prompt Template Handlers ===
+
+type PromptTemplateRequest struct {
+	Name        string `json:"name"`
+	Content     string `json:"content"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+}
+
+type PromptTemplatesResponse struct {
+	Templates  []sqlite.PromptTemplate `json:"templates"`
+	Categories []string                `json:"categories"`
+}
+
+// GetPromptTemplatesHandler gibt alle Prompt-Templates zurück
+func (h *Handlers) GetPromptTemplatesHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Optionaler Kategorie-Filter
+	category := r.URL.Query().Get("category")
+
+	var templates []sqlite.PromptTemplate
+	var err error
+
+	if category != "" {
+		templates, err = h.storage.App.GetPromptTemplatesByCategory(category)
+	} else {
+		templates, err = h.storage.App.GetAllPromptTemplates()
+	}
+
+	if err != nil {
+		log.Printf("Error getting prompt templates: %v", err)
+		writeError(w, "Failed to get prompt templates", http.StatusInternalServerError)
+		return
+	}
+
+	categories, _ := h.storage.App.GetPromptTemplateCategories()
+
+	if templates == nil {
+		templates = []sqlite.PromptTemplate{}
+	}
+	if categories == nil {
+		categories = []string{}
+	}
+
+	writeJSON(w, PromptTemplatesResponse{
+		Templates:  templates,
+		Categories: categories,
+	})
+}
+
+// GetPromptTemplateHandler gibt ein einzelnes Template zurück
+func (h *Handlers) GetPromptTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		writeError(w, "id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	template, err := h.storage.App.GetPromptTemplate(id)
+	if err != nil {
+		log.Printf("Error getting prompt template: %v", err)
+		writeError(w, "Failed to get prompt template", http.StatusInternalServerError)
+		return
+	}
+
+	if template == nil {
+		writeError(w, "Template not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, template)
+}
+
+// CreatePromptTemplateHandler erstellt ein neues Template
+func (h *Handlers) CreatePromptTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var req PromptTemplateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if req.Content == "" {
+		writeError(w, "Content is required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := h.storage.App.CreatePromptTemplate(req.Name, req.Content, req.Description, req.Category)
+	if err != nil {
+		log.Printf("Error creating prompt template: %v", err)
+		writeError(w, "Failed to create prompt template", http.StatusInternalServerError)
+		return
+	}
+
+	template, _ := h.storage.App.GetPromptTemplate(id)
+	writeJSON(w, template)
+}
+
+// UpdatePromptTemplateHandler aktualisiert ein Template
+func (h *Handlers) UpdatePromptTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		writeError(w, "id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req PromptTemplateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if req.Content == "" {
+		writeError(w, "Content is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.storage.App.UpdatePromptTemplate(id, req.Name, req.Content, req.Description, req.Category); err != nil {
+		log.Printf("Error updating prompt template: %v", err)
+		writeError(w, "Failed to update prompt template", http.StatusInternalServerError)
+		return
+	}
+
+	template, _ := h.storage.App.GetPromptTemplate(id)
+	writeJSON(w, template)
+}
+
+// DeletePromptTemplateHandler löscht ein Template
+func (h *Handlers) DeletePromptTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		writeError(w, "id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.storage.App.DeletePromptTemplate(id); err != nil {
+		log.Printf("Error deleting prompt template: %v", err)
+		writeError(w, "Failed to delete prompt template", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]string{"status": "ok"})
 }

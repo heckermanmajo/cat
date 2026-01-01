@@ -2,6 +2,9 @@ package fetchqueue
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
 	"school-local-backend/db/duckdb"
@@ -11,34 +14,38 @@ import (
 type FetchType string
 
 const (
-	FetchTypeAboutPage     FetchType = "about_page"
-	FetchTypeProfile       FetchType = "profile"
-	FetchTypeMembers       FetchType = "members"
-	FetchTypeCommunityPage FetchType = "community_page"
-	FetchTypePostDetails   FetchType = "post_details"
-	FetchTypeLikes         FetchType = "likes"
+	FetchTypeMembers           FetchType = "members"            // Primär: Member-Listen (paginiert)
+	FetchTypeCommunityPage     FetchType = "community_page"     // Primär: Posts-Übersicht (paginiert)
+	FetchTypePostDetails       FetchType = "post_details"       // Sekundär: Post-Details inkl. Kommentare
+	FetchTypeLikes             FetchType = "likes"              // Sekundär: Post-Likes
+	FetchTypeProfile           FetchType = "profile"            // Tertiär: Member-Profile
+	FetchTypeAboutPage         FetchType = "about_page"         // Optional: Community About-Seite
+	FetchTypeSharedCommunities FetchType = "shared_communities" // Erweitert: Communities mit gemeinsamen Members
 )
 
 // FetchPriority definiert die Priorität eines Fetches
+// Niedrigere Werte = höhere Priorität
 type FetchPriority int
 
 const (
-	PriorityHigh   FetchPriority = 1
-	PriorityMedium FetchPriority = 2
-	PriorityLow    FetchPriority = 3
+	PriorityCritical FetchPriority = 0 // Initiale Fetches, ohne die nichts geht
+	PriorityHigh     FetchPriority = 1 // Primäre Fetches (Members, Posts)
+	PriorityMedium   FetchPriority = 2 // Sekundäre Fetches (Details, Likes)
+	PriorityLow      FetchPriority = 3 // Tertiäre Fetches (Profile)
+	PriorityLowest   FetchPriority = 4 // Erweiterte Fetches (Shared Communities)
 )
 
 // FetchTask repräsentiert einen einzelnen Fetch-Auftrag
 type FetchTask struct {
-	ID           string                 `json:"id"`
-	Type         FetchType              `json:"type"`
-	Priority     FetchPriority          `json:"priority"`
-	CommunityID  string                 `json:"communityId,omitempty"`
-	EntityID     string                 `json:"entityId,omitempty"`
-	Page         int                    `json:"page,omitempty"`
-	Params       map[string]interface{} `json:"params,omitempty"`
-	Reason       string                 `json:"reason"`
-	LastFetchedAt *time.Time            `json:"lastFetchedAt,omitempty"`
+	ID            string                 `json:"id"`
+	Type          FetchType              `json:"type"`
+	Priority      FetchPriority          `json:"priority"`
+	CommunityID   string                 `json:"communityId,omitempty"`
+	EntityID      string                 `json:"entityId,omitempty"`
+	Page          int                    `json:"page,omitempty"`
+	Params        map[string]interface{} `json:"params,omitempty"`
+	Reason        string                 `json:"reason"`
+	LastFetchedAt *time.Time             `json:"lastFetchedAt,omitempty"`
 }
 
 // FetchQueue enthält die priorisierte Liste der nächsten Fetches
@@ -50,23 +57,41 @@ type FetchQueue struct {
 
 // QueueConfig enthält die Konfiguration für die Queue-Generierung
 type QueueConfig struct {
-	CommunityIDs        []string      // Zu überwachende Communities
-	MaxTasksPerType     int           // Max Tasks pro Typ
-	RefreshInterval     time.Duration // Wie oft sollen Daten refresht werden
-	MembersPageSize     int           // Seitengröße für Members
-	PostsPageSize       int           // Seitengröße für Posts
-	FetchPostLikes      bool          // Ob Post-Likes gefetcht werden sollen
+	CommunityIDs             []string      // Zu überwachende Communities
+	MaxTasksPerType          int           // Max Tasks pro Typ (0 = unbegrenzt)
+	RefreshInterval          time.Duration // Wie oft sollen Daten refresht werden
+	MembersPageSize          int           // Seitengröße für Members
+	PostsPageSize            int           // Seitengröße für Posts
+	FetchPostLikes           bool          // Ob Post-Likes gefetcht werden sollen
+	FetchPostComments        bool          // Ob Post-Kommentare gefetcht werden sollen (via post_details)
+	FetchMemberProfiles      bool          // Ob Member-Profile gefetcht werden sollen
+	FetchSharedCommunities   bool          // Ob Shared Communities analysiert werden sollen
+	MinSharedMembersForFetch int           // Mindestanzahl gemeinsamer Members für Community-Fetch
+	StopOnOldData            bool          // Stoppt Pagination wenn alte Daten erreicht werden
 }
 
 // DefaultConfig gibt die Standard-Konfiguration zurück
 func DefaultConfig() QueueConfig {
 	return QueueConfig{
-		MaxTasksPerType:  10,
-		RefreshInterval:  24 * time.Hour,
-		MembersPageSize:  50,
-		PostsPageSize:    20,
-		FetchPostLikes:   true,
+		MaxTasksPerType:          0, // Unbegrenzt
+		RefreshInterval:          24 * time.Hour,
+		MembersPageSize:          50,
+		PostsPageSize:            20,
+		FetchPostLikes:           true,
+		FetchPostComments:        true,
+		FetchMemberProfiles:      true,
+		FetchSharedCommunities:   true,
+		MinSharedMembersForFetch: 3, // Mindestens 3 gemeinsame Members
+		StopOnOldData:            true,
 	}
+}
+
+// CommunityWithSharedMembers repräsentiert eine Community mit Anzahl gemeinsamer Members
+type CommunityWithSharedMembers struct {
+	CommunityID   string   `json:"communityId"`
+	CommunityName string   `json:"communityName"`
+	SharedCount   int      `json:"sharedCount"`
+	MemberIDs     []string `json:"memberIds,omitempty"`
 }
 
 // QueueBuilder baut die Fetch-Queue basierend auf dem aktuellen Datenstand
@@ -83,330 +108,605 @@ func NewQueueBuilder(rawDB *duckdb.RawDB, config QueueConfig) *QueueBuilder {
 	}
 }
 
-// BuildQueue erstellt die aktuelle Fetch-Queue
+// BuildQueue erstellt die aktuelle Fetch-Queue nach der neuen Hierarchie:
+// 1. PRIMÄR: Members + Community Page (Posts) - inkrementell bis alte Daten
+// 2. SEKUNDÄR: Post Details (Kommentare) + Likes für neue Posts
+// 3. TERTIÄR: Profile für neue Members
+// 4. ERWEITERT: Shared Communities (Communities mit vielen gemeinsamen Members)
 func (qb *QueueBuilder) BuildQueue(communityIDs []string) (*FetchQueue, error) {
 	queue := &FetchQueue{
 		Tasks:       make([]FetchTask, 0),
 		GeneratedAt: time.Now(),
 	}
 
-	for _, communityID := range communityIDs {
-		// 1. About Page prüfen
-		aboutTasks, err := qb.checkAboutPage(communityID)
-		if err != nil {
-			return nil, err
-		}
-		queue.Tasks = append(queue.Tasks, aboutTasks...)
+	// Sammle alle neuen Post-IDs und Member-IDs über alle Communities
+	allNewPostIDs := make(map[string]string)     // postID -> communityID
+	allNewMemberIDs := make(map[string]string)   // memberID -> communityID
+	communityGroupIDs := make(map[string]string) // communityID (slug) -> groupId (Skool UUID)
 
-		// 2. Members Pages prüfen
-		membersTasks, err := qb.checkMembersPages(communityID)
+	for _, communityID := range communityIDs {
+		// Hole den letzten Fetch-Zeitpunkt für diese Community (Wasserzeichen)
+		watermark := qb.getLastFetchWatermark(communityID)
+
+		// ========================================
+		// PHASE 1: PRIMÄRE FETCHES (Members + Posts)
+		// ========================================
+
+		// 1a. Members Pages - Inkrementell fetchen
+		membersTasks, newMemberIDs, err := qb.buildMembersTasks(communityID, watermark)
 		if err != nil {
 			return nil, err
 		}
 		queue.Tasks = append(queue.Tasks, membersTasks...)
+		for _, mid := range newMemberIDs {
+			allNewMemberIDs[mid] = communityID
+		}
 
-		// 3. Community Page (Posts) prüfen
-		postsTasks, err := qb.checkCommunityPage(communityID)
+		// 1b. Community Page (Posts) - Inkrementell fetchen
+		postsTasks, newPostIDs, err := qb.buildPostsTasks(communityID, watermark)
 		if err != nil {
 			return nil, err
 		}
 		queue.Tasks = append(queue.Tasks, postsTasks...)
-
-		// 4. Profile Pages für bekannte Members prüfen
-		profileTasks, err := qb.checkProfiles(communityID)
-		if err != nil {
-			return nil, err
+		for _, pid := range newPostIDs {
+			allNewPostIDs[pid] = communityID
 		}
-		queue.Tasks = append(queue.Tasks, profileTasks...)
 
-		// 5. Post Details für bekannte Posts prüfen
-		detailsTasks, err := qb.checkPostDetails(communityID)
-		if err != nil {
-			return nil, err
-		}
-		queue.Tasks = append(queue.Tasks, detailsTasks...)
-
-		// 6. Likes für Posts prüfen
-		if qb.config.FetchPostLikes {
-			likesTasks, err := qb.checkLikes(communityID)
-			if err != nil {
-				return nil, err
+		// Extrahiere groupId (Skool UUID) für diese Community aus den Posts
+		// Wird für api2.skool.com API-Aufrufe benötigt (z.B. Likes)
+		page1ID := communityID + "_page_1"
+		if rawJSON, _, err := qb.rawDB.GetLatestFetch(string(FetchTypeCommunityPage), page1ID); err == nil {
+			if groupID := qb.extractGroupID(rawJSON); groupID != "" {
+				communityGroupIDs[communityID] = groupID
 			}
+		}
+	}
+
+	// ========================================
+	// PHASE 2: SEKUNDÄRE FETCHES (Post Details + Likes)
+	// ========================================
+
+	// 2a. Post Details (inkl. Kommentare) für neue Posts
+	if qb.config.FetchPostComments {
+		for postID, communityID := range allNewPostIDs {
+			groupID := communityGroupIDs[communityID] // Skool UUID für api2.skool.com
+			detailsTasks := qb.buildPostDetailsTasks(communityID, postID, groupID)
+			queue.Tasks = append(queue.Tasks, detailsTasks...)
+		}
+	}
+
+	// 2b. Likes für neue Posts
+	if qb.config.FetchPostLikes {
+		for postID, communityID := range allNewPostIDs {
+			groupID := communityGroupIDs[communityID] // Skool UUID für api2.skool.com
+			likesTasks := qb.buildLikesTasks(communityID, postID, groupID)
 			queue.Tasks = append(queue.Tasks, likesTasks...)
 		}
 	}
 
-	// Nach Priorität sortieren
-	qb.sortByPriority(queue.Tasks)
+	// ========================================
+	// PHASE 3: TERTIÄRE FETCHES (Member Profiles)
+	// ========================================
+
+	if qb.config.FetchMemberProfiles {
+		for memberID, communityID := range allNewMemberIDs {
+			profileTasks := qb.buildProfileTasks(communityID, memberID)
+			queue.Tasks = append(queue.Tasks, profileTasks...)
+		}
+	}
+
+	// ========================================
+	// PHASE 4: ERWEITERTE FETCHES (Shared Communities)
+	// ========================================
+
+	if qb.config.FetchSharedCommunities {
+		for _, communityID := range communityIDs {
+			sharedTasks, err := qb.buildSharedCommunitiesTasks(communityID)
+			if err != nil {
+				// Fehler loggen aber nicht abbrechen
+				continue
+			}
+			queue.Tasks = append(queue.Tasks, sharedTasks...)
+		}
+	}
+
+	// Nach Priorität sortieren (stabil, damit Reihenfolge innerhalb gleicher Priorität erhalten bleibt)
+	sort.SliceStable(queue.Tasks, func(i, j int) bool {
+		return queue.Tasks[i].Priority < queue.Tasks[j].Priority
+	})
 
 	queue.TotalTasks = len(queue.Tasks)
 	return queue, nil
 }
 
-// checkAboutPage prüft ob die About Page gefetcht werden muss
-func (qb *QueueBuilder) checkAboutPage(communityID string) ([]FetchTask, error) {
-	tasks := make([]FetchTask, 0)
-
-	// Prüfen ob wir bereits einen About Page Fetch haben
-	_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeAboutPage), communityID)
+// getLastFetchWatermark holt den Zeitpunkt des letzten vollständigen Fetches für eine Community
+func (qb *QueueBuilder) getLastFetchWatermark(communityID string) time.Time {
+	// Prüfe den neuesten Members-Fetch für diese Community
+	page1ID := communityID + "_page_1"
+	_, membersTime, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), page1ID)
 	if err != nil {
-		// Kein Fetch vorhanden - muss gefetcht werden
-		tasks = append(tasks, FetchTask{
-			ID:          generateTaskID(FetchTypeAboutPage, communityID, ""),
-			Type:        FetchTypeAboutPage,
-			Priority:    PriorityHigh,
-			CommunityID: communityID,
-			Reason:      "About Page noch nie gefetcht",
-		})
-		return tasks, nil
+		return time.Time{} // Kein vorheriger Fetch
 	}
 
-	// Prüfen ob Refresh nötig
-	if time.Since(fetchedAt) > qb.config.RefreshInterval {
-		tasks = append(tasks, FetchTask{
-			ID:            generateTaskID(FetchTypeAboutPage, communityID, ""),
-			Type:          FetchTypeAboutPage,
-			Priority:      PriorityMedium,
-			CommunityID:   communityID,
-			Reason:        "About Page Refresh fällig",
-			LastFetchedAt: &fetchedAt,
-		})
+	// Prüfe auch den neuesten Community-Page-Fetch
+	_, postsTime, err := qb.rawDB.GetLatestFetch(string(FetchTypeCommunityPage), page1ID)
+	if err != nil {
+		return membersTime
 	}
 
-	return tasks, nil
+	// Nimm den älteren der beiden als Wasserzeichen
+	if membersTime.Before(postsTime) {
+		return membersTime
+	}
+	return postsTime
 }
 
-// checkMembersPages prüft welche Members Pages gefetcht werden müssen
-func (qb *QueueBuilder) checkMembersPages(communityID string) ([]FetchTask, error) {
+// buildMembersTasks erstellt Tasks für Members-Fetches und gibt neue Member-IDs zurück
+func (qb *QueueBuilder) buildMembersTasks(communityID string, watermark time.Time) ([]FetchTask, []string, error) {
 	tasks := make([]FetchTask, 0)
+	newMemberIDs := make([]string, 0)
 
-	// Prüfen ob wir Page 1 haben
+	// Prüfe ob Page 1 existiert
 	page1ID := communityID + "_page_1"
-	_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), page1ID)
+	rawJSON, lastFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), page1ID)
+
 	if err != nil {
-		// Erste Members Page muss gefetcht werden
+		// Noch nie gefetcht - CRITICAL Priority für initiale Daten
 		tasks = append(tasks, FetchTask{
 			ID:          generateTaskID(FetchTypeMembers, communityID, "page_1"),
 			Type:        FetchTypeMembers,
-			Priority:    PriorityHigh,
+			Priority:    PriorityCritical,
 			CommunityID: communityID,
 			Page:        1,
-			Reason:      "Members Page 1 noch nie gefetcht",
+			Reason:      "Initiales Members-Fetch - noch keine Daten vorhanden",
 		})
-		return tasks, nil
+		return tasks, newMemberIDs, nil
 	}
 
-	// Aus Page 1 die Gesamtzahl und weitere Pages ermitteln
-	totalPages, err := qb.getTotalMembersPages(communityID)
-	if err != nil {
-		totalPages = 1 // Fallback
-	}
+	// Prüfe ob Refresh nötig (älter als RefreshInterval)
+	needsRefresh := time.Since(lastFetchedAt) > qb.config.RefreshInterval
 
-	// Prüfen ob Refresh der ersten Seite nötig
-	if time.Since(fetchedAt) > qb.config.RefreshInterval {
+	if needsRefresh {
+		// Refresh nötig - HIGH Priority
 		tasks = append(tasks, FetchTask{
 			ID:            generateTaskID(FetchTypeMembers, communityID, "page_1"),
 			Type:          FetchTypeMembers,
-			Priority:      PriorityMedium,
+			Priority:      PriorityHigh,
 			CommunityID:   communityID,
 			Page:          1,
-			Reason:        "Members Page 1 Refresh fällig",
-			LastFetchedAt: &fetchedAt,
+			Reason:        fmt.Sprintf("Members-Refresh fällig (letzter Fetch: %s)", lastFetchedAt.Format("2006-01-02 15:04")),
+			LastFetchedAt: &lastFetchedAt,
 		})
 	}
 
-	// Weitere Pages prüfen
-	for page := 2; page <= totalPages && page <= qb.config.MaxTasksPerType; page++ {
-		pageID := communityID + "_page_" + string(rune('0'+page))
-		_, _, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), pageID)
+	// Extrahiere Member-IDs aus existierenden Daten und prüfe auf neue Members
+	existingMemberIDs, totalPages := qb.extractMemberInfo(rawJSON)
+
+	// Identifiziere neue Members (die noch kein Profile haben)
+	for _, memberID := range existingMemberIDs {
+		entityID := communityID + "_" + memberID
+		_, _, err := qb.rawDB.GetLatestFetch(string(FetchTypeProfile), entityID)
 		if err != nil {
-			tasks = append(tasks, FetchTask{
-				ID:          generateTaskID(FetchTypeMembers, communityID, "page_"+string(rune('0'+page))),
-				Type:        FetchTypeMembers,
-				Priority:    PriorityMedium,
-				CommunityID: communityID,
-				Page:        page,
-				Reason:      "Members Page noch nicht gefetcht",
-			})
+			// Profil noch nicht gefetcht - ist ein "neuer" Member
+			newMemberIDs = append(newMemberIDs, memberID)
 		}
 	}
 
-	return tasks, nil
+	// Prüfe weitere Pages
+	for page := 2; page <= totalPages; page++ {
+		pageID := communityID + "_page_" + strconv.Itoa(page)
+		_, pageFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), pageID)
+
+		if err != nil {
+			// Page noch nicht gefetcht
+			tasks = append(tasks, FetchTask{
+				ID:          generateTaskID(FetchTypeMembers, communityID, "page_"+strconv.Itoa(page)),
+				Type:        FetchTypeMembers,
+				Priority:    PriorityHigh,
+				CommunityID: communityID,
+				Page:        page,
+				Reason:      fmt.Sprintf("Members Page %d noch nicht gefetcht", page),
+			})
+		} else if needsRefresh || time.Since(pageFetchedAt) > qb.config.RefreshInterval {
+			// Page braucht Refresh
+			tasks = append(tasks, FetchTask{
+				ID:            generateTaskID(FetchTypeMembers, communityID, "page_"+strconv.Itoa(page)),
+				Type:          FetchTypeMembers,
+				Priority:      PriorityHigh,
+				CommunityID:   communityID,
+				Page:          page,
+				Reason:        fmt.Sprintf("Members Page %d Refresh fällig", page),
+				LastFetchedAt: &pageFetchedAt,
+			})
+		}
+
+		// Limitierung falls konfiguriert
+		if qb.config.MaxTasksPerType > 0 && len(tasks) >= qb.config.MaxTasksPerType {
+			break
+		}
+	}
+
+	return tasks, newMemberIDs, nil
 }
 
-// checkCommunityPage prüft ob die Community Page (Posts) gefetcht werden muss
-func (qb *QueueBuilder) checkCommunityPage(communityID string) ([]FetchTask, error) {
+// buildPostsTasks erstellt Tasks für Community-Page-Fetches und gibt neue Post-IDs zurück
+func (qb *QueueBuilder) buildPostsTasks(communityID string, watermark time.Time) ([]FetchTask, []string, error) {
 	tasks := make([]FetchTask, 0)
+	newPostIDs := make([]string, 0)
 
-	// Prüfen ob Page 1 vorhanden
+	// Prüfe ob Page 1 existiert
 	page1ID := communityID + "_page_1"
-	_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeCommunityPage), page1ID)
+	rawJSON, lastFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeCommunityPage), page1ID)
+
 	if err != nil {
+		// Noch nie gefetcht - CRITICAL Priority
 		tasks = append(tasks, FetchTask{
 			ID:          generateTaskID(FetchTypeCommunityPage, communityID, "page_1"),
 			Type:        FetchTypeCommunityPage,
-			Priority:    PriorityHigh,
+			Priority:    PriorityCritical,
 			CommunityID: communityID,
 			Page:        1,
-			Reason:      "Community Posts Page 1 noch nie gefetcht",
+			Reason:      "Initiales Posts-Fetch - noch keine Daten vorhanden",
 		})
-		return tasks, nil
+		return tasks, newPostIDs, nil
 	}
 
-	// Refresh prüfen
-	if time.Since(fetchedAt) > qb.config.RefreshInterval {
+	// Prüfe ob Refresh nötig
+	needsRefresh := time.Since(lastFetchedAt) > qb.config.RefreshInterval
+
+	if needsRefresh {
 		tasks = append(tasks, FetchTask{
 			ID:            generateTaskID(FetchTypeCommunityPage, communityID, "page_1"),
 			Type:          FetchTypeCommunityPage,
-			Priority:      PriorityMedium,
+			Priority:      PriorityHigh,
 			CommunityID:   communityID,
 			Page:          1,
-			Reason:        "Community Posts Refresh fällig",
-			LastFetchedAt: &fetchedAt,
+			Reason:        fmt.Sprintf("Posts-Refresh fällig (letzter Fetch: %s)", lastFetchedAt.Format("2006-01-02 15:04")),
+			LastFetchedAt: &lastFetchedAt,
 		})
 	}
 
-	return tasks, nil
-}
+	// Extrahiere Post-IDs und identifiziere neue Posts
+	existingPostIDs := qb.extractPostIDs(rawJSON)
 
-// checkProfiles prüft welche Profile Pages gefetcht werden müssen
-func (qb *QueueBuilder) checkProfiles(communityID string) ([]FetchTask, error) {
-	tasks := make([]FetchTask, 0)
-
-	// Member IDs aus den Members-Fetches extrahieren
-	memberIDs, err := qb.getMemberIDsFromFetches(communityID)
-	if err != nil || len(memberIDs) == 0 {
-		return tasks, nil
-	}
-
-	// Für jeden Member prüfen ob Profile gefetcht wurde
-	count := 0
-	for _, memberID := range memberIDs {
-		if count >= qb.config.MaxTasksPerType {
-			break
-		}
-
-		entityID := communityID + "_" + memberID
-		_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeProfile), entityID)
-		if err != nil {
-			tasks = append(tasks, FetchTask{
-				ID:          generateTaskID(FetchTypeProfile, communityID, memberID),
-				Type:        FetchTypeProfile,
-				Priority:    PriorityLow,
-				CommunityID: communityID,
-				EntityID:    memberID,
-				Reason:      "Member Profil noch nie gefetcht",
-			})
-			count++
-		} else if time.Since(fetchedAt) > qb.config.RefreshInterval {
-			tasks = append(tasks, FetchTask{
-				ID:            generateTaskID(FetchTypeProfile, communityID, memberID),
-				Type:          FetchTypeProfile,
-				Priority:      PriorityLow,
-				CommunityID:   communityID,
-				EntityID:      memberID,
-				Reason:        "Member Profil Refresh fällig",
-				LastFetchedAt: &fetchedAt,
-			})
-			count++
-		}
-	}
-
-	return tasks, nil
-}
-
-// checkPostDetails prüft welche Post Details gefetcht werden müssen
-func (qb *QueueBuilder) checkPostDetails(communityID string) ([]FetchTask, error) {
-	tasks := make([]FetchTask, 0)
-
-	// Post IDs aus den Community Page Fetches extrahieren
-	postIDs, err := qb.getPostIDsFromFetches(communityID)
-	if err != nil || len(postIDs) == 0 {
-		return tasks, nil
-	}
-
-	// Für jeden Post prüfen ob Details gefetcht wurden
-	count := 0
-	for _, postID := range postIDs {
-		if count >= qb.config.MaxTasksPerType {
-			break
-		}
-
+	for _, postID := range existingPostIDs {
 		entityID := communityID + "_" + postID
-		_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypePostDetails), entityID)
+		_, _, err := qb.rawDB.GetLatestFetch(string(FetchTypePostDetails), entityID)
 		if err != nil {
-			tasks = append(tasks, FetchTask{
-				ID:          generateTaskID(FetchTypePostDetails, communityID, postID),
-				Type:        FetchTypePostDetails,
-				Priority:    PriorityMedium,
-				CommunityID: communityID,
-				EntityID:    postID,
-				Reason:      "Post Details noch nie gefetcht",
-			})
-			count++
-		} else if time.Since(fetchedAt) > qb.config.RefreshInterval {
-			tasks = append(tasks, FetchTask{
-				ID:            generateTaskID(FetchTypePostDetails, communityID, postID),
-				Type:          FetchTypePostDetails,
-				Priority:      PriorityLow,
-				CommunityID:   communityID,
-				EntityID:      postID,
-				Reason:        "Post Details Refresh fällig",
-				LastFetchedAt: &fetchedAt,
-			})
-			count++
+			// Post-Details noch nicht gefetcht - ist ein "neuer" Post
+			newPostIDs = append(newPostIDs, postID)
 		}
 	}
+
+	return tasks, newPostIDs, nil
+}
+
+// buildPostDetailsTasks erstellt einen Task für Post-Details (inkl. Kommentare)
+// groupID ist die Skool UUID (nicht der Slug) - wird für api2.skool.com benötigt
+func (qb *QueueBuilder) buildPostDetailsTasks(communityID, postID, groupID string) []FetchTask {
+	tasks := make([]FetchTask, 0)
+
+	entityID := communityID + "_" + postID
+	_, lastFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypePostDetails), entityID)
+
+	// Params mit groupId für api2.skool.com API-Aufrufe
+	params := map[string]interface{}{}
+	if groupID != "" {
+		params["groupId"] = groupID
+	}
+
+	if err != nil {
+		// Noch nie gefetcht
+		tasks = append(tasks, FetchTask{
+			ID:          generateTaskID(FetchTypePostDetails, communityID, postID),
+			Type:        FetchTypePostDetails,
+			Priority:    PriorityMedium,
+			CommunityID: communityID,
+			EntityID:    postID,
+			Params:      params,
+			Reason:      "Post-Details (Kommentare) noch nie gefetcht",
+		})
+	} else if time.Since(lastFetchedAt) > qb.config.RefreshInterval {
+		tasks = append(tasks, FetchTask{
+			ID:            generateTaskID(FetchTypePostDetails, communityID, postID),
+			Type:          FetchTypePostDetails,
+			Priority:      PriorityMedium,
+			CommunityID:   communityID,
+			EntityID:      postID,
+			Params:        params,
+			Reason:        "Post-Details Refresh fällig",
+			LastFetchedAt: &lastFetchedAt,
+		})
+	}
+
+	return tasks
+}
+
+// buildLikesTasks erstellt einen Task für Post-Likes
+// groupID ist die Skool UUID (nicht der Slug) - wird für api2.skool.com benötigt
+func (qb *QueueBuilder) buildLikesTasks(communityID, postID, groupID string) []FetchTask {
+	tasks := make([]FetchTask, 0)
+
+	entityID := communityID + "_post_" + postID
+	_, lastFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeLikes), entityID)
+
+	// Params mit groupId für api2.skool.com API-Aufrufe
+	params := map[string]interface{}{
+		"targetType": "post",
+	}
+	if groupID != "" {
+		params["groupId"] = groupID
+	}
+
+	if err != nil {
+		tasks = append(tasks, FetchTask{
+			ID:          generateTaskID(FetchTypeLikes, communityID, "post_"+postID),
+			Type:        FetchTypeLikes,
+			Priority:    PriorityMedium,
+			CommunityID: communityID,
+			EntityID:    postID,
+			Params:      params,
+			Reason:      "Post-Likes noch nie gefetcht",
+		})
+	} else if time.Since(lastFetchedAt) > qb.config.RefreshInterval {
+		tasks = append(tasks, FetchTask{
+			ID:            generateTaskID(FetchTypeLikes, communityID, "post_"+postID),
+			Type:          FetchTypeLikes,
+			Priority:      PriorityMedium,
+			CommunityID:   communityID,
+			EntityID:      postID,
+			Params:        params,
+			Reason:        "Post-Likes Refresh fällig",
+			LastFetchedAt: &lastFetchedAt,
+		})
+	}
+
+	return tasks
+}
+
+// buildProfileTasks erstellt einen Task für Member-Profile
+func (qb *QueueBuilder) buildProfileTasks(communityID, memberID string) []FetchTask {
+	tasks := make([]FetchTask, 0)
+
+	entityID := communityID + "_" + memberID
+	_, lastFetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeProfile), entityID)
+
+	if err != nil {
+		tasks = append(tasks, FetchTask{
+			ID:          generateTaskID(FetchTypeProfile, communityID, memberID),
+			Type:        FetchTypeProfile,
+			Priority:    PriorityLow,
+			CommunityID: communityID,
+			EntityID:    memberID,
+			Reason:      "Member-Profil noch nie gefetcht",
+		})
+	} else if time.Since(lastFetchedAt) > qb.config.RefreshInterval {
+		tasks = append(tasks, FetchTask{
+			ID:            generateTaskID(FetchTypeProfile, communityID, memberID),
+			Type:          FetchTypeProfile,
+			Priority:      PriorityLow,
+			CommunityID:   communityID,
+			EntityID:      memberID,
+			Reason:        "Member-Profil Refresh fällig",
+			LastFetchedAt: &lastFetchedAt,
+		})
+	}
+
+	return tasks
+}
+
+// buildSharedCommunitiesTasks analysiert Member-Profile und erstellt Tasks für gemeinsame Communities
+func (qb *QueueBuilder) buildSharedCommunitiesTasks(communityID string) ([]FetchTask, error) {
+	tasks := make([]FetchTask, 0)
+
+	// Hole alle Profile-Fetches für diese Community
+	sharedCommunities, err := qb.analyzeSharedCommunities(communityID)
+	if err != nil {
+		return tasks, err
+	}
+
+	// Erstelle Tasks für Communities mit genug gemeinsamen Members
+	for _, sc := range sharedCommunities {
+		if sc.SharedCount < qb.config.MinSharedMembersForFetch {
+			continue
+		}
+
+		// Prüfe ob wir diese Community schon fetchen
+		_, _, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), sc.CommunityID+"_page_1")
+		if err != nil {
+			// Community noch nicht gefetcht
+			tasks = append(tasks, FetchTask{
+				ID:          generateTaskID(FetchTypeSharedCommunities, communityID, sc.CommunityID),
+				Type:        FetchTypeSharedCommunities,
+				Priority:    PriorityLowest,
+				CommunityID: sc.CommunityID,
+				Params: map[string]interface{}{
+					"sourceCommunity": communityID,
+					"sharedCount":     sc.SharedCount,
+					"communityName":   sc.CommunityName,
+				},
+				Reason: fmt.Sprintf("Community mit %d gemeinsamen Members", sc.SharedCount),
+			})
+		}
+	}
+
+	// Sortiere nach Anzahl gemeinsamer Members (absteigend)
+	sort.SliceStable(tasks, func(i, j int) bool {
+		countI := tasks[i].Params["sharedCount"].(int)
+		countJ := tasks[j].Params["sharedCount"].(int)
+		return countI > countJ
+	})
 
 	return tasks, nil
 }
 
-// checkLikes prüft welche Post Likes gefetcht werden müssen
-func (qb *QueueBuilder) checkLikes(communityID string) ([]FetchTask, error) {
-	tasks := make([]FetchTask, 0)
-
-	// Post IDs aus den Community Page Fetches extrahieren
-	postIDs, err := qb.getPostIDsFromFetches(communityID)
-	if err != nil || len(postIDs) == 0 {
-		return tasks, nil
+// analyzeSharedCommunities analysiert die Profile-Daten um gemeinsame Communities zu finden
+func (qb *QueueBuilder) analyzeSharedCommunities(communityID string) ([]CommunityWithSharedMembers, error) {
+	// Hole alle Profile-Fetches
+	fetches, err := qb.rawDB.GetAllLatestByType(string(FetchTypeProfile))
+	if err != nil {
+		return nil, err
 	}
 
-	// Für jeden Post prüfen ob Likes gefetcht wurden
-	count := 0
-	for _, postID := range postIDs {
-		if count >= qb.config.MaxTasksPerType {
-			break
+	// Map: CommunityID -> Liste von MemberIDs
+	communityMembers := make(map[string][]string)
+	communityNames := make(map[string]string)
+
+	for _, fetch := range fetches {
+		// Nur Profile aus unserer Community betrachten
+		if len(fetch.EntityID) <= len(communityID)+1 {
+			continue
+		}
+		if fetch.EntityID[:len(communityID)] != communityID {
+			continue
 		}
 
-		entityID := communityID + "_post_" + postID
-		_, fetchedAt, err := qb.rawDB.GetLatestFetch(string(FetchTypeLikes), entityID)
-		if err != nil {
-			tasks = append(tasks, FetchTask{
-				ID:          generateTaskID(FetchTypeLikes, communityID, "post_"+postID),
-				Type:        FetchTypeLikes,
-				Priority:    PriorityLow,
-				CommunityID: communityID,
-				EntityID:    postID,
-				Params:      map[string]interface{}{"targetType": "post"},
-				Reason:      "Post Likes noch nie gefetcht",
-			})
-			count++
-		} else if time.Since(fetchedAt) > qb.config.RefreshInterval {
-			tasks = append(tasks, FetchTask{
-				ID:            generateTaskID(FetchTypeLikes, communityID, "post_"+postID),
-				Type:          FetchTypeLikes,
-				Priority:      PriorityLow,
-				CommunityID:   communityID,
-				EntityID:      postID,
-				Params:        map[string]interface{}{"targetType": "post"},
-				Reason:        "Post Likes Refresh fällig",
-				LastFetchedAt: &fetchedAt,
-			})
-			count++
+		memberID := fetch.EntityID[len(communityID)+1:]
+
+		// Communities aus dem Profil extrahieren
+		var profileData struct {
+			PageProps struct {
+				User struct {
+					Groups []struct {
+						ID   string `json:"id"`
+						Name string `json:"name"`
+						Slug string `json:"slug"`
+					} `json:"groups"`
+				} `json:"user"`
+			} `json:"pageProps"`
+		}
+
+		if err := json.Unmarshal([]byte(fetch.RawJSON), &profileData); err != nil {
+			continue
+		}
+
+		for _, group := range profileData.PageProps.User.Groups {
+			if group.ID == communityID || group.Slug == communityID {
+				continue // Eigene Community überspringen
+			}
+
+			targetID := group.Slug
+			if targetID == "" {
+				targetID = group.ID
+			}
+
+			communityMembers[targetID] = append(communityMembers[targetID], memberID)
+			if group.Name != "" {
+				communityNames[targetID] = group.Name
+			}
 		}
 	}
 
-	return tasks, nil
+	// Konvertiere zu Ergebnis-Slice
+	result := make([]CommunityWithSharedMembers, 0, len(communityMembers))
+	for cid, members := range communityMembers {
+		result = append(result, CommunityWithSharedMembers{
+			CommunityID:   cid,
+			CommunityName: communityNames[cid],
+			SharedCount:   len(members),
+			MemberIDs:     members,
+		})
+	}
+
+	// Sortiere nach Anzahl (absteigend)
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].SharedCount > result[j].SharedCount
+	})
+
+	return result, nil
+}
+
+// extractMemberInfo extrahiert Member-IDs und Gesamtseitenzahl aus Members-JSON
+func (qb *QueueBuilder) extractMemberInfo(rawJSON string) ([]string, int) {
+	memberIDs := make([]string, 0)
+	totalPages := 1
+
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
+		return memberIDs, totalPages
+	}
+
+	if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
+		// Gesamtseitenzahl
+		if tp, ok := pageProps["totalPages"].(float64); ok {
+			totalPages = int(tp)
+		}
+
+		// Member-IDs
+		if users, ok := pageProps["users"].([]interface{}); ok {
+			for _, user := range users {
+				if u, ok := user.(map[string]interface{}); ok {
+					if id, ok := u["id"].(string); ok {
+						memberIDs = append(memberIDs, id)
+					}
+				}
+			}
+		}
+	}
+
+	return memberIDs, totalPages
+}
+
+// extractPostIDs extrahiert Post-IDs aus Community-Page-JSON
+func (qb *QueueBuilder) extractPostIDs(rawJSON string) []string {
+	postIDs := make([]string, 0)
+
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
+		return postIDs
+	}
+
+	if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
+		if postTrees, ok := pageProps["postTrees"].([]interface{}); ok {
+			for _, pt := range postTrees {
+				if tree, ok := pt.(map[string]interface{}); ok {
+					if post, ok := tree["post"].(map[string]interface{}); ok {
+						if id, ok := post["id"].(string); ok {
+							postIDs = append(postIDs, id)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return postIDs
+}
+
+// extractGroupID extrahiert die Skool Group-ID (UUID) aus Community-Page-JSON
+// Die groupId wird benötigt für api2.skool.com API-Aufrufe (z.B. Likes)
+func (qb *QueueBuilder) extractGroupID(rawJSON string) string {
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
+		return ""
+	}
+
+	// Try to get groupId from first post
+	if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
+		if postTrees, ok := pageProps["postTrees"].([]interface{}); ok {
+			for _, pt := range postTrees {
+				if tree, ok := pt.(map[string]interface{}); ok {
+					if post, ok := tree["post"].(map[string]interface{}); ok {
+						if groupId, ok := post["groupId"].(string); ok && groupId != "" {
+							return groupId
+						}
+					}
+				}
+			}
+		}
+		// Fallback: try pageProps.groupId directly
+		if groupId, ok := pageProps["groupId"].(string); ok && groupId != "" {
+			return groupId
+		}
+		// Fallback: try pageProps.group.id
+		if group, ok := pageProps["group"].(map[string]interface{}); ok {
+			if groupId, ok := group["id"].(string); ok && groupId != "" {
+				return groupId
+			}
+		}
+	}
+
+	return ""
 }
 
 // Helper: Task ID generieren
@@ -418,101 +718,8 @@ func generateTaskID(fetchType FetchType, communityID, suffix string) string {
 	return id
 }
 
-// Helper: Tasks nach Priorität sortieren
-func (qb *QueueBuilder) sortByPriority(tasks []FetchTask) {
-	// Simple Bubble Sort für kleine Listen
-	for i := 0; i < len(tasks); i++ {
-		for j := i + 1; j < len(tasks); j++ {
-			if tasks[j].Priority < tasks[i].Priority {
-				tasks[i], tasks[j] = tasks[j], tasks[i]
-			}
-		}
-	}
-}
-
-// Helper: Member IDs aus Fetches extrahieren
-func (qb *QueueBuilder) getMemberIDsFromFetches(communityID string) ([]string, error) {
-	fetches, err := qb.rawDB.GetAllLatestByType(string(FetchTypeMembers))
-	if err != nil {
-		return nil, err
-	}
-
-	memberIDs := make([]string, 0)
-	for _, fetch := range fetches {
-		// JSON parsen und Member IDs extrahieren
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(fetch.RawJSON), &data); err != nil {
-			continue
-		}
-
-		// pageProps.users oder pageProps.renderData.members
-		if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
-			if users, ok := pageProps["users"].([]interface{}); ok {
-				for _, user := range users {
-					if u, ok := user.(map[string]interface{}); ok {
-						if id, ok := u["id"].(string); ok {
-							memberIDs = append(memberIDs, id)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return memberIDs, nil
-}
-
-// Helper: Post IDs aus Fetches extrahieren
-func (qb *QueueBuilder) getPostIDsFromFetches(communityID string) ([]string, error) {
-	fetches, err := qb.rawDB.GetAllLatestByType(string(FetchTypeCommunityPage))
-	if err != nil {
-		return nil, err
-	}
-
-	postIDs := make([]string, 0)
-	for _, fetch := range fetches {
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(fetch.RawJSON), &data); err != nil {
-			continue
-		}
-
-		// pageProps.postTrees
-		if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
-			if postTrees, ok := pageProps["postTrees"].([]interface{}); ok {
-				for _, pt := range postTrees {
-					if tree, ok := pt.(map[string]interface{}); ok {
-						if post, ok := tree["post"].(map[string]interface{}); ok {
-							if id, ok := post["id"].(string); ok {
-								postIDs = append(postIDs, id)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return postIDs, nil
-}
-
-// Helper: Gesamtzahl der Members Pages ermitteln
-func (qb *QueueBuilder) getTotalMembersPages(communityID string) (int, error) {
-	page1ID := communityID + "_page_1"
-	rawJSON, _, err := qb.rawDB.GetLatestFetch(string(FetchTypeMembers), page1ID)
-	if err != nil {
-		return 1, err
-	}
-
-	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
-		return 1, err
-	}
-
-	if pageProps, ok := data["pageProps"].(map[string]interface{}); ok {
-		if totalPages, ok := pageProps["totalPages"].(float64); ok {
-			return int(totalPages), nil
-		}
-	}
-
-	return 1, nil
+// GetSharedCommunities gibt die Shared-Communities-Analyse für eine Community zurück
+// Dies kann vom Handler genutzt werden, um dem User die Analyse anzuzeigen
+func (qb *QueueBuilder) GetSharedCommunities(communityID string) ([]CommunityWithSharedMembers, error) {
+	return qb.analyzeSharedCommunities(communityID)
 }

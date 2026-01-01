@@ -28,6 +28,15 @@
   opacity: 0.9;
 }
 
+.sidebar-hint {
+  padding: 12px;
+  font-size: 0.85em;
+  color: var(--text-muted, #666);
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  text-align: center;
+  font-style: italic;
+}
+
 .report-list {
   flex: 1;
   overflow-y: auto;
@@ -60,29 +69,29 @@
   white-space: nowrap;
 }
 
-.report-item .delete-btn {
-  opacity: 0;
-  background: none;
-  border: none;
-  color: var(--text-muted, #888);
-  cursor: pointer;
-  padding: 2px 6px;
-  font-size: 14px;
-}
-
-.report-item:hover .delete-btn {
-  opacity: 1;
-}
-
-.report-item .delete-btn:hover {
-  color: #e53935;
-}
-
 .no-reports {
   padding: 20px;
   text-align: center;
   color: var(--text-muted, #888);
   font-size: 0.9em;
+}
+
+/* Sidebar sections */
+.sidebar-section {
+  padding: 12px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.sidebar-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.85em;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+[data-theme="dark"] .sidebar-section {
+  border-color: #333;
 }
 
 /* Main report area */
@@ -139,27 +148,6 @@
   background: var(--block-bg, #fff);
 }
 
-.report-block:hover .block-delete-btn {
-  opacity: 1;
-}
-
-.block-delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
-  background: #e53935;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  transition: opacity 0.15s;
-}
-
 .text-block p {
   margin: 0;
   white-space: pre-wrap;
@@ -173,73 +161,6 @@
   color: var(--error-color, #e53935);
   font-style: italic;
   margin: 0;
-}
-
-/* Add block section */
-.add-block-section {
-  border-top: 2px dashed var(--border-color, #ddd);
-  padding-top: 24px;
-  margin-top: 24px;
-}
-
-.add-block-section h4 {
-  margin: 0 0 12px 0;
-  color: var(--text-muted, #666);
-}
-
-.block-type-selector {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.block-type-selector button {
-  padding: 8px 16px;
-  border: 1px solid var(--border-color, #ddd);
-  background: var(--btn-bg, #fff);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.block-type-selector button:hover {
-  background: var(--btn-hover-bg, #f5f5f5);
-}
-
-.block-type-selector button.active {
-  background: var(--accent-color, #007bff);
-  color: white;
-  border-color: var(--accent-color, #007bff);
-}
-
-.add-block-section textarea,
-.add-block-section select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border-color, #ddd);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: inherit;
-  margin-bottom: 12px;
-}
-
-.add-block-section textarea:focus,
-.add-block-section select:focus {
-  outline: none;
-  border-color: var(--accent-color, #007bff);
-}
-
-.add-block-btn {
-  padding: 10px 20px;
-  background: var(--success-color, #28a745);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.add-block-btn:hover {
-  opacity: 0.9;
 }
 
 /* No report selected */
@@ -283,21 +204,4 @@
 [data-theme="dark"] .report-block {
   background: #2a2a2a;
   border-color: #444;
-}
-
-[data-theme="dark"] .add-block-section {
-  border-color: #444;
-}
-
-[data-theme="dark"] .block-type-selector button {
-  background: #333;
-  border-color: #555;
-  color: inherit;
-}
-
-[data-theme="dark"] .add-block-section textarea,
-[data-theme="dark"] .add-block-section select {
-  background: #2a2a2a;
-  border-color: #444;
-  color: inherit;
 }

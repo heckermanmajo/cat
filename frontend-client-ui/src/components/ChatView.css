@@ -2,7 +2,6 @@
   display: flex;
   height: calc(100vh - 60px);
   overflow: hidden;
-  max-width: 1200px;
 }
 
 /* Sidebar */
@@ -25,6 +24,70 @@
 
 .new-chat-btn:hover {
   background: var(--bg-alt);
+}
+
+/* New chat form */
+.new-chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px;
+}
+
+.new-chat-input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9em;
+}
+
+.new-chat-input:focus {
+  outline: none;
+  border-color: var(--text);
+}
+
+.new-chat-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.new-chat-actions button {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.new-chat-actions button:hover {
+  background: var(--bg-alt);
+}
+
+.new-chat-actions .confirm-btn:hover {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* Archive toggle */
+.archive-toggle {
+  padding: 4px 8px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.archive-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.archive-toggle input[type="checkbox"] {
+  cursor: pointer;
 }
 
 .chat-list {
@@ -58,21 +121,91 @@
   white-space: nowrap;
 }
 
-.chat-item .delete-btn {
-  opacity: 0;
+/* Chat menu container */
+.chat-menu-container {
+  position: relative;
+}
+
+.chat-menu-btn {
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   padding: 2px 6px;
+  font-size: 1.1em;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.chat-item:hover .delete-btn {
+.chat-item:hover .chat-menu-btn,
+.chat-menu-btn:focus {
   opacity: 1;
 }
 
-.chat-item .delete-btn:hover {
+.chat-menu-btn:hover {
+  color: var(--text);
+}
+
+/* Dropdown menu */
+.chat-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 120px;
+}
+
+.chat-menu-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.chat-menu-dropdown button:hover {
+  background: var(--bg-alt);
+}
+
+.chat-menu-dropdown button.delete-option {
   color: #cc0000;
+}
+
+.chat-menu-dropdown button.delete-option:hover {
+  background: rgba(204, 0, 0, 0.1);
+}
+
+/* Inline title editing */
+.chat-title-input {
+  flex: 1;
+  padding: 2px 4px;
+  border: 1px solid var(--text);
+  background: var(--bg);
+  color: var(--text);
+  font-size: inherit;
+  min-width: 0;
+}
+
+.chat-title-input:focus {
+  outline: none;
+}
+
+/* Archived chat styling */
+.chat-item.archived {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.chat-item.archived .chat-title {
+  color: var(--text-muted);
 }
 
 .no-chats {
@@ -89,15 +222,34 @@
   overflow: hidden;
 }
 
-.chat-header {
-  padding: 8px 16px;
+/* Chat main header with template toggle */
+.chat-main-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-alt);
 }
 
-.chat-header h3 {
-  margin: 0;
-  font-size: 1em;
+.template-toggle-btn {
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85em;
+  border-radius: 4px;
+}
+
+.template-toggle-btn:hover {
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+
+.template-toggle-btn.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
 .messages-container {
@@ -234,4 +386,216 @@
 
 .no-chat-selected button:hover {
   background: var(--bg-alt);
+}
+
+/* Report Panel */
+.chat-report-panel {
+  width: 350px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.report-panel-header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.report-panel-header h4 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.report-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.report-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-block-item {
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.report-block-item p {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.empty-report-panel {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-report-panel .hint {
+  margin-top: 8px;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+/* Adding indicator */
+.report-adding-indicator {
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Report Block Text */
+.report-block-text {
+  margin: 0 0 8px 0;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+/* Selection Card in Report Panel */
+.selection-report-card {
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  margin-top: 8px;
+}
+
+.selection-report-card.expanded {
+  border-color: var(--text);
+}
+
+.selection-report-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.selection-report-header:hover {
+  background: var(--bg);
+}
+
+.selection-type-badge {
+  font-size: 0.7em;
+  padding: 2px 6px;
+  background: var(--text);
+  color: var(--bg);
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.selection-report-header .selection-name {
+  font-weight: bold;
+  flex: 1;
+  font-size: 0.9em;
+}
+
+.selection-report-header .selection-count {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.selection-report-header .expand-icon {
+  font-size: 0.7em;
+  color: var(--text-muted);
+}
+
+/* Expanded Details */
+.selection-report-details {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.selection-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.selection-report-filters strong {
+  font-size: 0.8em;
+  margin-right: 4px;
+}
+
+.selection-report-filters .filter-tag {
+  font-size: 0.75em;
+  padding: 2px 6px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Results Preview */
+.selection-report-results {
+  font-size: 0.85em;
+}
+
+.selection-report-results .loading-hint,
+.selection-report-results .type-hint,
+.selection-report-results .no-results {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.posts-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.post-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+}
+
+.post-preview-item .post-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-preview-item .post-meta {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.more-hint {
+  margin: 4px 0 0 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.selection-report-loading,
+.selection-report-error {
+  padding: 8px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85em;
 }

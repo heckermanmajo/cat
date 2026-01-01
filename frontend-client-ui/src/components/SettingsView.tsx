@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
+import LoggingView from './LoggingView'
+import FetchesView from './FetchesView'
+import FetchQueueView from './FetchQueueView'
+import DataView from './DataView'
 import './SettingsView.css'
 
 const API_BASE = '/api'
+
+type SettingsTab = 'settings' | 'fetch-queue' | 'fetches' | 'data' | 'logs'
 
 interface SettingField {
   key: string
@@ -28,7 +34,7 @@ const SETTINGS_FIELDS: SettingField[] = [
   }
 ]
 
-export function SettingsView() {
+function GeneralSettings() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -87,16 +93,12 @@ export function SettingsView() {
   }
 
   if (loading) {
-    return (
-      <div className="settings-view">
-        <p>Loading settings...</p>
-      </div>
-    )
+    return <p>Loading settings...</p>
   }
 
   return (
-    <div className="settings-view">
-      <h2>Settings</h2>
+    <div className="general-settings">
+      <h3>General Settings</h3>
       <p>Configure your CatKnows instance</p>
 
       {error && <p className="error">{error}</p>}
@@ -130,6 +132,55 @@ export function SettingsView() {
           <li><strong>OpenAI API Key:</strong> Required for AI-powered analysis. The key is stored locally and never sent to our servers.</li>
         </ul>
       </fieldset>
+    </div>
+  )
+}
+
+export function SettingsView() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('settings')
+
+  return (
+    <div className="settings-view">
+      <div className="settings-tabs">
+        <button
+          className={activeTab === 'settings' ? 'active' : ''}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
+        </button>
+        <button
+          className={activeTab === 'fetch-queue' ? 'active' : ''}
+          onClick={() => setActiveTab('fetch-queue')}
+        >
+          Fetch Queue
+        </button>
+        <button
+          className={activeTab === 'fetches' ? 'active' : ''}
+          onClick={() => setActiveTab('fetches')}
+        >
+          Fetches
+        </button>
+        <button
+          className={activeTab === 'data' ? 'active' : ''}
+          onClick={() => setActiveTab('data')}
+        >
+          Data View
+        </button>
+        <button
+          className={activeTab === 'logs' ? 'active' : ''}
+          onClick={() => setActiveTab('logs')}
+        >
+          Logs
+        </button>
+      </div>
+
+      <div className="settings-content">
+        {activeTab === 'settings' && <GeneralSettings />}
+        {activeTab === 'fetch-queue' && <FetchQueueView />}
+        {activeTab === 'fetches' && <FetchesView />}
+        {activeTab === 'data' && <DataView />}
+        {activeTab === 'logs' && <LoggingView />}
+      </div>
     </div>
   )
 }

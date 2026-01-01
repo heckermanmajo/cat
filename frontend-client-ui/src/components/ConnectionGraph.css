@@ -1,0 +1,214 @@
+/* ConnectionGraph - Wireframe Style */
+
+.connection-graph {
+  padding: 12px;
+}
+
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.graph-title {
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.graph-filters {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.filter-checkbox input {
+  cursor: pointer;
+}
+
+/* Stats */
+.graph-stats {
+  display: flex;
+  gap: 1px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.stat-item {
+  flex: 1;
+  padding: 8px;
+  text-align: center;
+  background: var(--bg);
+}
+
+.stat-item:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.2em;
+  font-weight: 700;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+/* Graph Container - vis.js */
+.graph-container {
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+  height: 300px;
+  background: var(--bg);
+}
+
+/* Graph Controls */
+.graph-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.control-btn {
+  padding: 4px 10px;
+  font-size: 0.85em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text);
+}
+
+.control-btn:hover {
+  background: var(--bg-alt);
+}
+
+.control-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+/* Loading, Error, Empty States */
+.loading-state,
+.error-state,
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.error-state {
+  color: #c44;
+}
+
+.empty-state small {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85em;
+}
+
+/* Connections List */
+.connections-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.connections-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-label {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.sort-select {
+  padding: 4px 8px;
+  font-size: 0.8em;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.connections-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.no-connections {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.connection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.connection-item:last-child {
+  border-bottom: none;
+}
+
+.connection-members {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.connection-arrow {
+  color: var(--text-muted);
+  font-size: 0.8em;
+}
+
+.connection-types {
+  display: flex;
+  gap: 4px;
+}
+
+.type-badge {
+  padding: 2px 6px;
+  font-size: 0.75em;
+  font-family: monospace;
+  border: 1px solid var(--border);
+}
+
+.type-like {
+  background: var(--bg);
+}
+
+.type-comment {
+  background: var(--bg-alt);
+}
