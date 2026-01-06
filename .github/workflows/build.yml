@@ -1,13 +1,15 @@
 name: Build CatKnows
 
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:  # Manueller Trigger
+  workflow_dispatch:
     inputs:
       deploy:
         description: 'Deploy to production server'
+        required: false
+        default: false
+        type: boolean
+      release:
+        description: 'Create GitHub Release'
         required: false
         default: false
         type: boolean
@@ -59,7 +61,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.deploy == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.event.inputs.deploy == 'true' }}
 
     steps:
       - name: Checkout
@@ -105,7 +107,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ github.event.inputs.release == 'true' }}
 
     steps:
       - name: Download all artifacts
