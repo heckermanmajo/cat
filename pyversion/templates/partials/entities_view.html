@@ -1,0 +1,161 @@
+<div class="entities-overview">
+    <!-- Stats Cards -->
+    <div class="entity-cards">
+        <div class="entity-card">
+            <div class="entity-icon">👥</div>
+            <div class="entity-info">
+                <span class="entity-count">{{ stats.members }}</span>
+                <span class="entity-label">Members</span>
+            </div>
+        </div>
+        <div class="entity-card">
+            <div class="entity-icon">📝</div>
+            <div class="entity-info">
+                <span class="entity-count">{{ stats.posts }}</span>
+                <span class="entity-label">Posts</span>
+            </div>
+        </div>
+        <div class="entity-card">
+            <div class="entity-icon">🏠</div>
+            <div class="entity-info">
+                <span class="entity-count">{{ stats.communities }}</span>
+                <span class="entity-label">Communities</span>
+            </div>
+        </div>
+        <div class="entity-card source">
+            <div class="entity-icon">📦</div>
+            <div class="entity-info">
+                <span class="entity-count">{{ stats.raw_fetches }}</span>
+                <span class="entity-label">Raw Fetches</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="entity-actions">
+        <button class="danger"
+                hx-post="/htmx/entities/reprocess"
+                hx-target="#entities-content"
+                hx-confirm="Alle extrahierten Entities löschen und neu berechnen?"
+                hx-indicator="#reprocess-spinner">
+            <span class="htmx-indicator" id="reprocess-spinner">⏳</span>
+            Alle löschen & neu berechnen
+        </button>
+    </div>
+
+    <!-- Data Tables -->
+    <div class="entity-tables">
+        <!-- Members Table -->
+        <details class="entity-section" open>
+            <summary>
+                <span class="section-title">👥 Members ({{ stats.members }})</span>
+            </summary>
+            <div class="table-container">
+                {% if members %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Slug</th>
+                            <th>Role</th>
+                            <th>Level</th>
+                            <th>Posts</th>
+                            <th>Community</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in members %}
+                        <tr>
+                            <td>{{ m.name or '-' }}</td>
+                            <td class="mono">{{ m.slug or '-' }}</td>
+                            <td><span class="badge {{ m.role }}">{{ m.role }}</span></td>
+                            <td>{{ m.level }}</td>
+                            <td>{{ m.post_count }}</td>
+                            <td class="mono truncate" title="{{ m.community_id }}">{{ m.community_id[:8] }}...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if stats.members > 20 %}
+                <p class="table-hint">Zeige 20 von {{ stats.members }} Members</p>
+                {% endif %}
+                {% else %}
+                <p class="empty-state">Keine Members extrahiert</p>
+                {% endif %}
+            </div>
+        </details>
+
+        <!-- Posts Table -->
+        <details class="entity-section">
+            <summary>
+                <span class="section-title">📝 Posts ({{ stats.posts }})</span>
+            </summary>
+            <div class="table-container">
+                {% if posts %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Likes</th>
+                            <th>Comments</th>
+                            <th>Community</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in posts %}
+                        <tr>
+                            <td class="truncate" title="{{ p.title }}">{{ (p.title or '-')[:50] }}{% if p.title and p.title|length > 50 %}...{% endif %}</td>
+                            <td>{{ p.author_name or '-' }}</td>
+                            <td>{{ p.likes }}</td>
+                            <td>{{ p.comments }}</td>
+                            <td class="mono truncate" title="{{ p.community_id }}">{{ p.community_id[:8] }}...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if stats.posts > 20 %}
+                <p class="table-hint">Zeige 20 von {{ stats.posts }} Posts</p>
+                {% endif %}
+                {% else %}
+                <p class="empty-state">Keine Posts extrahiert</p>
+                {% endif %}
+            </div>
+        </details>
+
+        <!-- Communities Table -->
+        <details class="entity-section">
+            <summary>
+                <span class="section-title">🏠 Communities ({{ stats.communities }})</span>
+            </summary>
+            <div class="table-container">
+                {% if communities %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Slug</th>
+                            <th>Members</th>
+                            <th>Posts</th>
+                            <th>ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in communities %}
+                        <tr>
+                            <td>{{ c.name or '-' }}</td>
+                            <td class="mono">{{ c.slug or '-' }}</td>
+                            <td>{{ c.member_count }}</td>
+                            <td>{{ c.post_count }}</td>
+                            <td class="mono truncate" title="{{ c.id }}">{{ c.id[:12] }}...</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state">Keine Communities extrahiert</p>
+                {% endif %}
+            </div>
+        </details>
+    </div>
+</div>

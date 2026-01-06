@@ -1,0 +1,128 @@
+name: Build CatKnows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # Manueller Trigger
+    inputs:
+      deploy:
+        description: 'Deploy to production server'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: catknows-linux
+          - os: windows-latest
+            artifact_name: catknows-windows
+          - os: macos-latest
+            artifact_name: catknows-macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: pyversion/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r pyversion/requirements.txt
+
+      - name: Build with Nuitka
+        working-directory: pyversion
+        run: python build.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            pyversion/dist/catknows
+            pyversion/dist/catknows.exe
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deploy == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: catknows-linux
+          path: linux-binary
+
+      - name: Prepare deployment package
+        run: |
+          # Binary in webserver-Ordner kopieren
+          cp linux-binary/catknows webserver/catknows
+          chmod +x webserver/catknows
+
+          # ZIP erstellen (ohne .md und excalidraw)
+          cd webserver
+          zip -r ../web.zip ./* -x "*.md" "*excalidraw*"
+          cd ..
+          ls -la web.zip
+
+      - name: Deploy to production server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: w016728f.kasserver.com
+          SSH_USER: ssh-w016728f
+          DEPLOY_PATH: /www/htdocs/w016728f/cat-knows.com/
+        run: |
+          # SSH-Key einrichten
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+          # Upload und entpacken
+          scp web.zip ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}
+          ssh ${SSH_USER}@${SSH_HOST} "cd ${DEPLOY_PATH} && unzip -o web.zip && rm web.zip"
+
+          echo "Deployment erfolgreich!"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp artifacts/catknows-linux/catknows release/catknows-linux 2>/dev/null || true
+          cp artifacts/catknows-windows/catknows.exe release/catknows-windows.exe 2>/dev/null || true
+          cp artifacts/catknows-macos/catknows release/catknows-macos 2>/dev/null || true
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

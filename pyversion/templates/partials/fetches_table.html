@@ -1,0 +1,35 @@
+<div class="controls">
+    <select hx-get="/htmx/fetches" hx-target="#fetches-content" name="type">
+        <option value="">Alle Typen</option>
+        {% for t in entity_types %}
+        <option value="{{ t }}" {{ 'selected' if t == current_type else '' }}>{{ t }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Entity Type</th>
+            <th>Entity ID</th>
+            <th>Fetched At</th>
+            <th>JSON Preview</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for fetch in fetches %}
+        <tr>
+            <td>{{ fetch.id }}</td>
+            <td>{{ fetch.entity_type }}</td>
+            <td class="text-small">{{ fetch.entity_id[:30] }}{% if fetch.entity_id|length > 30 %}...{% endif %}</td>
+            <td class="text-small">{{ fetch.fetched_at[:19] }}</td>
+            <td>
+                <div class="json-preview">{{ fetch.raw_json[:200] }}{% if fetch.raw_json|length > 200 %}...{% endif %}</div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">Keine Fetches</td></tr>
+        {% endfor %}
+    </tbody>
+</table>

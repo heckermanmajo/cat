@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-layout">
+    <nav class="settings-tabs">
+        <a href="/settings?tab=settings"
+           class="{{ 'active' if tab == 'settings' else '' }}"
+           hx-boost="true">Settings</a>
+        <a href="/settings?tab=entities"
+           class="{{ 'active' if tab == 'entities' else '' }}"
+           hx-boost="true">Entities</a>
+        <a href="/settings?tab=queue"
+           class="{{ 'active' if tab == 'queue' else '' }}"
+           hx-boost="true">Fetch Queue</a>
+        <a href="/settings?tab=fetches"
+           class="{{ 'active' if tab == 'fetches' else '' }}"
+           hx-boost="true">Fetches</a>
+        <a href="/settings?tab=logs"
+           class="{{ 'active' if tab == 'logs' else '' }}"
+           hx-boost="true">Logs</a>
+        <a href="/settings?tab=license"
+           class="{{ 'active' if tab == 'license' else '' }}"
+           hx-boost="true">Lizenz</a>
+    </nav>
+
+    <div class="settings-content">
+        {% if tab == 'settings' %}
+            <h3>General Settings</h3>
+
+            <form hx-post="/htmx/settings" hx-target="#toast-container" hx-swap="innerHTML">
+                <fieldset>
+                    <legend>Community IDs</legend>
+                    <input type="hidden" name="key" value="community_ids">
+                    <input type="text" name="value" value="{{ community_ids }}"
+                           placeholder="my-community, another-community">
+                    <button type="submit">Speichern</button>
+                </fieldset>
+            </form>
+
+            <form hx-post="/htmx/settings" hx-target="#toast-container" hx-swap="innerHTML">
+                <fieldset>
+                    <legend>OpenAI API Key</legend>
+                    <input type="hidden" name="key" value="openai_api_key">
+                    <input type="password" name="value" value="{{ openai_api_key }}"
+                           placeholder="sk-...">
+                    <button type="submit">Speichern</button>
+                </fieldset>
+            </form>
+
+        {% elif tab == 'entities' %}
+            <h3>Extracted Entities</h3>
+            <p class="hint">Strukturierte Daten, extrahiert aus den Raw Fetches.</p>
+            <div id="entities-content" hx-get="/htmx/entities" hx-trigger="load">
+                Lade...
+            </div>
+
+        {% elif tab == 'logs' %}
+            <h3>Logs</h3>
+            <div class="controls">
+                <select hx-get="/htmx/logs" hx-target="#logs-table" name="level" hx-include="this">
+                    <option value="">Alle Level</option>
+                    <option value="error">Error</option>
+                    <option value="warn">Warn</option>
+                    <option value="info">Info</option>
+                    <option value="debug">Debug</option>
+                </select>
+                <button class="danger" hx-delete="/htmx/logs/clear" hx-target="#logs-table" hx-confirm="Alle Logs löschen?">
+                    Logs löschen
+                </button>
+            </div>
+            <div id="logs-table" hx-get="/htmx/logs" hx-trigger="load">
+                Lade...
+            </div>
+
+        {% elif tab == 'fetches' %}
+            <h3>Raw Fetches</h3>
+            <div id="fetches-content" hx-get="/htmx/fetches" hx-trigger="load">
+                Lade...
+            </div>
+
+        {% elif tab == 'queue' %}
+            <h3>Fetch Queue</h3>
+            <div id="queue-content" hx-get="/api/fetch-queue" hx-trigger="load">
+                Lade...
+            </div>
+
+        {% elif tab == 'license' %}
+            <h3>Lizenz</h3>
+            <div class="license-section">
+                {% if license.has_license %}
+                    <div class="license-info">
+                        <div class="license-status-row">
+                            <span class="label">Status:</span>
+                            {% if license.is_valid %}
+                                {% if license.in_grace_period %}
+                                    <span class="badge warning">Grace-Period</span>
+                                {% else %}
+                                    <span class="badge success">Aktiv</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge error">Abgelaufen</span>
+                            {% endif %}
+                        </div>
+                        <div class="license-status-row">
+                            <span class="label">Gueltig bis:</span>
+                            <span>{{ license.valid_until or '-' }}</span>
+                        </div>
+                        <div class="license-status-row">
+                            <span class="label">Features:</span>
+                            <span>{{ license.features | join(', ') if license.features else '-' }}</span>
+                        </div>
+                        <div class="license-status-row">
+                            <span class="label">Letzte Pruefung:</span>
+                            <span>{{ license.last_validated[:10] if license.last_validated else '-' }}</span>
+                        </div>
+                        <div class="license-status-row">
+                            <span class="label">Server:</span>
+                            {% if license.server_status == 'online' %}
+                                <span class="badge success">Online</span>
+                            {% elif license.server_status == 'offline' %}
+                                <span class="badge warning">Offline</span>
+                            {% else %}
+                                <span class="badge">Nicht geprueft</span>
+                            {% endif %}
+                        </div>
+                        {% if license.in_grace_period %}
+                            <div class="license-warning">
+                                Lizenz abgelaufen! Die App funktioniert noch fuer 7 Tage.
+                                Bitte erneuern Sie Ihre Lizenz.
+                            </div>
+                        {% endif %}
+                        {% if license.server_status == 'offline' %}
+                            <div class="license-info-box">
+                                Lizenz-Server nicht erreichbar. Die App verwendet die lokal gespeicherten Daten.
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="license-activate">
+                        <p>Keine Lizenz aktiviert. Geben Sie Ihren Lizenz-Key ein:</p>
+                        <form hx-post="/htmx/license/activate"
+                              hx-target="#license-result"
+                              hx-swap="innerHTML">
+                            <input type="text"
+                                   name="license_key"
+                                   placeholder="z.B. ABC-1234-XYZ-5678"
+                                   required
+                                   class="license-input">
+                            <button type="submit">Aktivieren</button>
+                        </form>
+                        <div id="license-result"></div>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+<h4>Ergebnisse: {{ selection.name }} ({{ total }} Treffer)</h4>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            {% if selection.output_type == 'post' %}
+            <th>Titel</th>
+            <th>Autor</th>
+            <th>Likes</th>
+            <th>Comments</th>
+            {% elif selection.output_type == 'member' %}
+            <th>Name</th>
+            <th>Role</th>
+            <th>Level</th>
+            <th>Posts</th>
+            {% else %}
+            <th>ID</th>
+            <th>Data</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for result in results %}
+        <tr>
+            {% if selection.output_type == 'post' %}
+            <td>{{ result.title[:50] }}{% if result.title|length > 50 %}...{% endif %}</td>
+            <td>{{ result.author_name }}</td>
+            <td>{{ result.likes }}</td>
+            <td>{{ result.comments }}</td>
+            {% elif selection.output_type == 'member' %}
+            <td>{{ result.name }}</td>
+            <td>{{ result.role }}</td>
+            <td>{{ result.level }}</td>
+            <td>{{ result.post_count }}</td>
+            {% else %}
+            <td>{{ result.id }}</td>
+            <td class="json-preview">{{ result }}</td>
+            {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">Keine Ergebnisse</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total > 100 %}
+<p class="text-dim text-small mt-2">Zeige 100 von {{ total }} Ergebnissen</p>
+{% endif %}

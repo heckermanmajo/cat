@@ -1,0 +1,75 @@
+<div class="messages" id="messages-container">
+    {% for message in messages %}
+    <div class="message {{ message.role }}">{{ message.content }}</div>
+    {% if message.role == 'assistant' and selections_by_message.get(message.id) %}
+    <div class="message-selections">
+        {% for sel in selections_by_message.get(message.id, []) %}
+        <div class="selection-card">
+            <div class="selection-card-header">
+                <span class="selection-icon">&#128269;</span>
+                <span class="selection-name">{{ sel.name }}</span>
+                <span class="selection-type">{{ sel.output_type }}</span>
+            </div>
+            <div class="selection-card-actions">
+                <a href="/filter?selection_id={{ sel.id }}"
+                   class="btn btn-sm"
+                   target="_blank">Ansehen</a>
+                <button class="btn btn-sm btn-primary"
+                        hx-get="/htmx/selection/{{ sel.id }}/execute"
+                        hx-target="#selection-results-{{ sel.id }}"
+                        hx-swap="innerHTML">Ausführen</button>
+            </div>
+            <details class="selection-debug">
+                <summary>Debug: Filter anzeigen</summary>
+                <div class="debug-content">
+                    <div class="debug-row">
+                        <span class="debug-label">Selection ID:</span>
+                        <span class="debug-value">{{ sel.id }}</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Output Type:</span>
+                        <span class="debug-value">{{ sel.output_type }}</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Created By:</span>
+                        <span class="debug-value">{{ sel.created_by }}</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Message ID:</span>
+                        <span class="debug-value">{{ sel.message_id }}</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Result Count:</span>
+                        <span class="debug-value">{{ sel.result_count }}</span>
+                    </div>
+                    <div class="debug-row full-width">
+                        <span class="debug-label">Filters JSON:</span>
+                        <pre class="debug-json">{{ sel.filters_json }}</pre>
+                    </div>
+                </div>
+            </details>
+            <div id="selection-results-{{ sel.id }}" class="selection-results"></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="empty-state">Keine Nachrichten. Starte eine Unterhaltung!</p>
+    {% endfor %}
+</div>
+
+<form class="chat-input"
+      hx-post="/htmx/chat/{{ chat_id }}/message"
+      hx-target="#chat-main"
+      hx-swap="innerHTML"
+      hx-indicator="#send-indicator">
+    <input type="text" name="content" placeholder="Nachricht eingeben..." autocomplete="off" autofocus>
+    <button type="submit">Senden</button>
+    <span id="send-indicator" class="htmx-indicator">...</span>
+</form>
+
+<script>
+    // Scroll to bottom
+    var container = document.getElementById('messages-container');
+    if (container) container.scrollTop = container.scrollHeight;
+</script>

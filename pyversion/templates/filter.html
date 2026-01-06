@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="filter-layout">
+    <aside class="filter-sidebar">
+        <h3>Filter erstellen</h3>
+
+        <form id="filter-form"
+              hx-post="/htmx/filter/preview"
+              hx-target="#filter-results">
+            <fieldset>
+                <legend>Typ</legend>
+                <select name="output_type"
+                        hx-get="/htmx/filter/form"
+                        hx-target="#dynamic-filters"
+                        hx-trigger="change"
+                        hx-include="this"
+                        hx-on::after-settle="htmx.trigger('#filter-form', 'submit')">
+                    <option value="post" {% if output_type == 'post' %}selected{% endif %}>Posts</option>
+                    <option value="member" {% if output_type == 'member' %}selected{% endif %}>Members</option>
+                    <option value="community" {% if output_type == 'community' %}selected{% endif %}>Communities</option>
+                </select>
+            </fieldset>
+
+            <div id="dynamic-filters" hx-on:change="clearTimeout(window.filterTimeout); window.filterTimeout = setTimeout(() => htmx.trigger('#filter-form', 'submit'), 300)"
+                 hx-on:input="clearTimeout(window.filterTimeout); window.filterTimeout = setTimeout(() => htmx.trigger('#filter-form', 'submit'), 300)">
+                {% include "partials/filter_form.html" %}
+            </div>
+        </form>
+
+        <hr class="divider">
+
+        <form hx-post="/htmx/filter/save" hx-target="#toast-container" hx-include="#filter-form">
+            <fieldset>
+                <legend>Als Selektion speichern</legend>
+                <input type="text" name="selection_name" placeholder="Name der Selektion" required>
+                <button type="submit">Speichern</button>
+            </fieldset>
+        </form>
+    </aside>
+
+    <section class="filter-results" id="filter-results">
+        <p class="empty-state">Wähle Filter aus - Ergebnisse werden automatisch angezeigt</p>
+    </section>
+</div>
+{% endblock %}

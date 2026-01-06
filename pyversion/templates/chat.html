@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="chat-layout">
+    <aside class="chat-sidebar" id="chat-sidebar">
+        <button hx-post="/htmx/chat" hx-target="#chat-sidebar" hx-swap="innerHTML">
+            + Neuer Chat
+        </button>
+        {% include "partials/chat_sidebar.html" %}
+    </aside>
+
+    <section class="chat-main" id="chat-main">
+        <p class="empty-state">Wähle einen Chat oder erstelle einen neuen.</p>
+    </section>
+</div>
+{% endblock %}

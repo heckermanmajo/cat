@@ -1,0 +1,251 @@
+<!-- Gemeinsame Filter -->
+{% if communities %}
+<fieldset>
+    <legend>Communities</legend>
+    <div class="checkbox-group community-select">
+        {% for community in communities %}
+        <label class="checkbox-label">
+            <input type="checkbox" name="community_ids" value="{{ community.id }}">
+            {{ community.name }}
+        </label>
+        {% endfor %}
+    </div>
+    <small class="hint">Keine Auswahl = alle Communities</small>
+</fieldset>
+{% endif %}
+
+<fieldset>
+    <legend>Suchtext</legend>
+    <input type="text" name="search_text" placeholder="Suche...">
+</fieldset>
+
+<fieldset>
+    <legend>Sortierung</legend>
+    <div class="sort-controls">
+        {% if output_type == 'post' %}
+        <select name="sort">
+            <option value="likes">Likes</option>
+            <option value="comments">Kommentare</option>
+            <option value="created_at">Erstelldatum</option>
+            <option value="title">Titel</option>
+        </select>
+        {% elif output_type == 'member' %}
+        <select name="sort">
+            <option value="level">Level</option>
+            <option value="post_count">Beitraege</option>
+            <option value="last_online">Letzte Aktivitaet</option>
+            <option value="joined">Beigetreten</option>
+            <option value="name">Name</option>
+        </select>
+        {% elif output_type == 'community' %}
+        <select name="sort">
+            <option value="member_count">Member-Anzahl</option>
+            <option value="post_count">Post-Anzahl</option>
+            <option value="name">Name</option>
+        </select>
+        {% endif %}
+        <select name="sort_order">
+            <option value="DESC">Absteigend</option>
+            <option value="ASC">Aufsteigend</option>
+        </select>
+    </div>
+</fieldset>
+
+{% if output_type == 'post' %}
+<!-- ===== POST FILTER ===== -->
+<fieldset>
+    <legend>Likes</legend>
+    <div class="range-inputs">
+        <input type="number" name="likes_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="likes_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Kommentare</legend>
+    <div class="range-inputs">
+        <input type="number" name="comments_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="comments_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Zeitraum</legend>
+    <div class="date-range">
+        <input type="date" name="date_from" placeholder="Von">
+        <span>bis</span>
+        <input type="date" name="date_to" placeholder="Bis">
+    </div>
+    <div class="quick-filter" style="margin-top: 8px;">
+        <label>Oder: Erstellt in letzten</label>
+        <input type="number" name="created_within_days" min="1" placeholder="X" style="width: 60px;">
+        <span>Tagen</span>
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Autor</legend>
+    <input type="text" name="author_name_contains" placeholder="Autorname enthält...">
+    <input type="text" name="exclude_author_ids" placeholder="Autor-IDs ausschließen (kommasepariert)" style="margin-top: 8px;">
+</fieldset>
+
+<fieldset>
+    <legend>Inhalt</legend>
+    <input type="text" name="title_contains" placeholder="Titel enthält...">
+    <input type="text" name="content_contains" placeholder="Inhalt enthält..." style="margin-top: 8px;">
+    <div class="range-inputs" style="margin-top: 8px;">
+        <input type="number" name="content_length_min" min="0" placeholder="Min Zeichen">
+        <span>-</span>
+        <input type="number" name="content_length_max" min="0" placeholder="Max Zeichen">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Optionen</legend>
+    <label class="checkbox-label">
+        <input type="checkbox" name="has_content" value="1">
+        Nur Posts mit Inhalt
+    </label>
+    <label class="checkbox-label">
+        <input type="checkbox" name="has_title" value="1">
+        Nur Posts mit Titel
+    </label>
+    <label class="checkbox-label">
+        <input type="checkbox" name="has_media" value="1">
+        Nur Posts mit Medien
+    </label>
+</fieldset>
+
+{% elif output_type == 'member' %}
+<!-- ===== MEMBER FILTER ===== -->
+<fieldset>
+    <legend>Rolle</legend>
+    <div class="checkbox-group">
+        <label class="checkbox-label">
+            <input type="checkbox" name="roles" value="admin">
+            Admin
+        </label>
+        <label class="checkbox-label">
+            <input type="checkbox" name="roles" value="group-moderator">
+            Group-Moderator
+        </label>
+        <label class="checkbox-label">
+            <input type="checkbox" name="roles" value="member">
+            Member
+        </label>
+    </div>
+    <label class="checkbox-label" style="margin-top: 8px;">
+        <input type="checkbox" name="is_owner" value="1">
+        Nur Owner
+    </label>
+</fieldset>
+
+<fieldset>
+    <legend>Level</legend>
+    <div class="range-inputs">
+        <input type="number" name="level_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="level_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Beitraege</legend>
+    <div class="range-inputs">
+        <input type="number" name="post_count_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="post_count_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Aktivitaet</legend>
+    <div class="activity-filters">
+        <div class="filter-row">
+            <label>Aktiv in letzten</label>
+            <input type="number" name="active_in_last_days" min="1" placeholder="X" style="width: 60px;">
+            <span>Tagen</span>
+        </div>
+        <div class="filter-row" style="margin-top: 8px;">
+            <label>Inaktiv seit</label>
+            <input type="number" name="inactive_since_days" min="1" placeholder="X" style="width: 60px;">
+            <span>Tagen</span>
+        </div>
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Beitrittsdatum</legend>
+    <div class="activity-filters">
+        <div class="filter-row">
+            <label>Beigetreten in letzten</label>
+            <input type="number" name="joined_within_days" min="1" placeholder="X" style="width: 60px;">
+            <span>Tagen</span>
+        </div>
+        <div class="filter-row" style="margin-top: 8px;">
+            <label>Beigetreten vor</label>
+            <input type="number" name="joined_before_days" min="1" placeholder="X" style="width: 60px;">
+            <span>Tagen</span>
+        </div>
+    </div>
+    <div class="date-range" style="margin-top: 12px;">
+        <input type="date" name="joined_after" placeholder="Nach">
+        <span>bis</span>
+        <input type="date" name="joined_before" placeholder="Vor">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Bio / Suche</legend>
+    <input type="text" name="bio_contains" placeholder="Bio enthält...">
+    <input type="text" name="exclude_member_ids" placeholder="Member-IDs ausschließen (kommasepariert)" style="margin-top: 8px;">
+</fieldset>
+
+<fieldset>
+    <legend>Optionen</legend>
+    <label class="checkbox-label">
+        <input type="checkbox" name="has_picture" value="1">
+        Nur mit Profilbild
+    </label>
+</fieldset>
+
+{% elif output_type == 'community' %}
+<!-- ===== COMMUNITY FILTER ===== -->
+<fieldset>
+    <legend>Member-Anzahl</legend>
+    <div class="range-inputs">
+        <input type="number" name="member_count_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="member_count_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Post-Anzahl</legend>
+    <div class="range-inputs">
+        <input type="number" name="post_count_min" min="0" placeholder="Min">
+        <span>-</span>
+        <input type="number" name="post_count_max" min="0" placeholder="Max">
+    </div>
+</fieldset>
+
+<fieldset>
+    <legend>Shared Members Analyse</legend>
+    <div class="filter-row">
+        <label>Mindestens</label>
+        <input type="number" name="min_shared_members" min="1" placeholder="X" style="width: 60px;">
+        <span>gemeinsame Member</span>
+    </div>
+    <small class="hint">Vergleicht Communities oben ausgewählt</small>
+</fieldset>
+
+<fieldset>
+    <legend>Optionen</legend>
+    <label class="checkbox-label">
+        <input type="checkbox" name="has_picture" value="1">
+        Nur mit Logo/Bild
+    </label>
+</fieldset>
+{% endif %}

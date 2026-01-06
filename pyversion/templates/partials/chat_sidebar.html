@@ -1,0 +1,16 @@
+{% for chat in chats %}
+<div class="chat-item {{ 'active' if active_chat == chat.id else '' }}"
+     hx-get="/htmx/chat/{{ chat.id }}"
+     hx-target="#chat-main"
+     hx-swap="innerHTML">
+    <span>{{ chat.title }}</span>
+    <button class="delete-btn"
+            hx-delete="/htmx/chat/{{ chat.id }}/delete"
+            hx-target="#chat-sidebar"
+            hx-swap="innerHTML"
+            hx-confirm="Chat löschen?"
+            onclick="event.stopPropagation()">×</button>
+</div>
+{% else %}
+<p class="text-dim text-small">Keine Chats vorhanden</p>
+{% endfor %}

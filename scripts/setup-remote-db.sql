@@ -1,9 +1,5 @@
--- Datenbank-Setup für Catknows Lizenz-Server
--- Ausführen mit: mysql -u root -p < setup.sql
-
-CREATE DATABASE IF NOT EXISTS catknows_license CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE catknows_license;
+-- Setup für Remote-Datenbank d045c2f8 auf frellow.de
+-- Ausführen mit: mysql -h frellow.de -u d045c2f8 -p d045c2f8 < scripts/setup-remote-db.sql
 
 -- Haupttabelle für Lizenzen
 CREATE TABLE IF NOT EXISTS licenses (
@@ -16,7 +12,7 @@ CREATE TABLE IF NOT EXISTS licenses (
     is_active BOOLEAN DEFAULT TRUE,
     max_activations INT DEFAULT 3,
     current_activations INT DEFAULT 0,
-    features JSON,  -- z.B. ["basic", "analytics", "ai"]
+    features JSON,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_check TIMESTAMP NULL,
@@ -44,7 +40,7 @@ CREATE TABLE IF NOT EXISTS activations (
 CREATE TABLE IF NOT EXISTS license_audit_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
     license_id INT,
-    action VARCHAR(50) NOT NULL,  -- 'check', 'activate', 'deactivate', 'expire', 'renew'
+    action VARCHAR(50) NOT NULL,
     machine_id VARCHAR(255),
     ip_address VARCHAR(45),
     details JSON,
@@ -54,7 +50,7 @@ CREATE TABLE IF NOT EXISTS license_audit_log (
     INDEX idx_created_at (created_at)
 );
 
--- Beispiel-Lizenz für Entwicklung (1 Jahr gültig)
+-- Dev-Lizenz
 INSERT INTO licenses (license_key, customer_email, customer_name, valid_until, features)
 VALUES (
     'DEV-TEST-LICENSE-2024',
@@ -64,8 +60,7 @@ VALUES (
     '["basic", "analytics", "ai", "dev"]'
 ) ON DUPLICATE KEY UPDATE valid_until = DATE_ADD(CURDATE(), INTERVAL 1 YEAR);
 
--- Hoomans Community Beispiel-Lizenz (1 Jahr gültig)
--- Community-ID auf Skool: hoomans
+-- Hoomans Community Lizenz
 INSERT INTO licenses (license_key, customer_email, customer_name, valid_until, features, notes)
 VALUES (
     'HOOMANS-2025-CATKNOWS',
@@ -76,7 +71,5 @@ VALUES (
     'Beispiel-Lizenz für Hoomans Skool Community. Community-ID: hoomans'
 ) ON DUPLICATE KEY UPDATE valid_until = DATE_ADD(CURDATE(), INTERVAL 1 YEAR);
 
--- User für PHP-Zugriff (in Produktion sicherere Credentials!)
--- CREATE USER IF NOT EXISTS 'catknows'@'localhost' IDENTIFIED BY 'CHANGE_ME_IN_PRODUCTION';
--- GRANT SELECT, INSERT, UPDATE ON catknows_license.* TO 'catknows'@'localhost';
--- FLUSH PRIVILEGES;
+SELECT 'Setup complete!' AS status;
+SELECT COUNT(*) AS license_count FROM licenses;

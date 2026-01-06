@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatKnows</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
+</head>
+<body>
+    <nav class="nav">
+        <strong>CatKnows</strong>
+        <span class="nav-sep">|</span>
+        <a href="/" class="{{ 'active' if request.path == '/' else '' }}">Chat</a>
+        <a href="/filter" class="{{ 'active' if request.path == '/filter' else '' }}">Filter</a>
+        <span class="nav-spacer"></span>
+        <a href="/settings" class="{{ 'active' if '/settings' in request.path else '' }}">Settings</a>
+    </nav>
+
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // Auto-remove toasts after 3 seconds
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'toast-container') {
+                setTimeout(function() {
+                    var toast = evt.detail.target.querySelector('.toast');
+                    if (toast) toast.remove();
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

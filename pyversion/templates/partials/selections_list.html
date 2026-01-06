@@ -1,0 +1,15 @@
+{% for selection in selections %}
+<div class="stat-card">
+    <div class="value">{{ selection.name }}</div>
+    <div class="label">{{ selection.output_type }} | {{ selection.result_count }} Ergebnisse</div>
+    <button class="secondary mt-2"
+            hx-get="/htmx/selection/{{ selection.id }}/execute"
+            hx-target="#selection-results">
+        Ausführen
+    </button>
+</div>
+{% else %}
+<p class="empty-state">Keine Selections vorhanden</p>
+{% endfor %}
+
+<div id="selection-results"></div>

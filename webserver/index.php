@@ -162,10 +162,10 @@
         <div class="other-platforms">
             <h3>Andere Plattformen</h3>
             <div class="platform-links" id="platform-links">
-                <a href="/api/download.php?platform=macos-arm64" class="platform-link" data-platform="macos-arm64">macOS (Apple Silicon)</a>
-                <a href="/api/download.php?platform=macos-amd64" class="platform-link" data-platform="macos-amd64">macOS (Intel)</a>
-                <a href="/api/download.php?platform=windows-amd64" class="platform-link" data-platform="windows-amd64">Windows (64-bit)</a>
-                <a href="/api/download.php?platform=linux-amd64" class="platform-link" data-platform="linux-amd64">Linux (64-bit)</a>
+                <a href="/download.php?platform=macos-arm64" class="platform-link" data-platform="macos-arm64">macOS (Apple Silicon)</a>
+                <a href="/download.php?platform=macos-amd64" class="platform-link" data-platform="macos-amd64">macOS (Intel)</a>
+                <a href="/download.php?platform=windows-amd64" class="platform-link" data-platform="windows-amd64">Windows (64-bit)</a>
+                <a href="/download.php?platform=linux-amd64" class="platform-link" data-platform="linux-amd64">Linux (64-bit)</a>
             </div>
         </div>
     </div>
@@ -262,7 +262,7 @@
         }
 
         function downloadForPlatform() {
-            window.location.href = '/api/download.php?platform=' + detectedPlatform;
+            window.location.href = '/download.php?platform=' + detectedPlatform;
         }
 
         // Run detection on page load
