@@ -112,6 +112,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.release == 'true' }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
