@@ -88,7 +88,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: w016728f.kasserver.com
           SSH_USER: ssh-w016728f
-          DEPLOY_PATH: /www/htdocs/w016728f/cat-knows.com/
+          DEPLOY_PATH: /www/htdocs/w016728f/testing.cat-knows.com/
         run: |
           # SSH-Key einrichten
           mkdir -p ~/.ssh
