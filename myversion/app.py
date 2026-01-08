@@ -7,6 +7,7 @@ from src.fetch_task import FetchTask
 from src.fetch import Fetch
 from src.user import User
 from src.post import Post
+from src.profile import Profile
 from src import extractor
 
 app = Flask(__name__, static_folder='static')
@@ -18,6 +19,7 @@ ConfigEntry.register(app)
 Fetch.register(app)
 User.register(app)
 Post.register(app)
+Profile.register(app)
 
 @app.route('/api/fetch-tasks')
 def get_fetch_tasks(): return jsonify([t.to_dict() for t in FetchTask.generateFetchTasks()])
@@ -27,7 +29,7 @@ def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
     results = request.json.get('results', [])
     saved = []
-    extracted = {'users': 0, 'posts': 0}
+    extracted = {'users': 0, 'posts': 0, 'profiles': 0}
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
@@ -35,6 +37,8 @@ def post_fetch_result():
             'type': task.get('type', ''),
             'community_slug': task.get('communitySlug', ''),
             'page_param': task.get('pageParam', 1),
+            'user_skool_id': task.get('userSkoolHexId', ''),
+            'post_skool_id': task.get('postSkoolHexId', ''),
             'status': 'ok' if result.get('ok') else 'error',
             'error_message': result.get('error', ''),
             'raw_data': json.dumps(result.get('data', {}))
@@ -45,6 +49,7 @@ def post_fetch_result():
         ex = extractor.extract_from_fetch(f)
         extracted['users'] += ex['users']
         extracted['posts'] += ex['posts']
+        extracted['profiles'] += ex['profiles']
     return jsonify({'saved': len(saved), 'fetches': saved, 'extracted': extracted}), 201
 
 @app.route('/api/extract/<int:fetch_id>', methods=['POST'])

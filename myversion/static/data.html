@@ -17,9 +17,22 @@
                 let el = document.getElementById(path)
                 el.style.display = 'block';
             }
-            function generateQueue(){
-                // send request to backend to generate fetch queue
-                // return is html list and then apply it to fetchqueue-target
+            async function generateQueue(){
+                const res = await fetch('/api/fetch-tasks');
+                const tasks = await res.json();
+                const target = document.getElementById('fetchqueue-target');
+                if(!tasks.length){ target.innerHTML = '<p>Keine Tasks</p>'; return; }
+                let html = '<table><tr><th>Type</th><th>Community</th><th>Page</th><th>Post ID</th><th>User ID</th></tr>';
+                for (const t of tasks) {
+                    html += `<tr>
+                        <td>${t.type}</td>
+                        <td>${t.communitySlug}</td>
+                        <td>${t.pageParam || '-'}</td>
+                        <td>${t.postSkoolHexId || '-'}</td>
+                        <td>${t.userSkoolHexId || '-'}</td>
+                    </tr>`;
+                }
+                target.innerHTML = html + '</table>';
             }
             async function loadRawData(){
                 const res = await fetch('/api/fetch');
@@ -78,12 +91,31 @@
                     }
                     target.innerHTML = html + '</table>';
                 }
+                if(tab === 'profiles'){
+                    const res = await fetch('/api/profile');
+                    const data = await res.json();
+                    if(!data.length){ target.innerHTML = '<p>Keine Profiles vorhanden</p>'; return; }
+                    let html = '<table><tr><th>ID</th><th>Skool ID</th><th>Name</th><th>Posts</th><th>Followers</th><th>Following</th><th>Contributions</th><th>Fetched</th></tr>';
+                    for (const p of data) {
+                        html += `<tr>
+                            <td>${p.id}</td>
+                            <td><small>${p.skool_id}</small></td>
+                            <td>${p.name}</td>
+                            <td>${p.total_posts}</td>
+                            <td>${p.total_followers}</td>
+                            <td>${p.total_following}</td>
+                            <td>${p.total_contributions}</td>
+                            <td><small>${new Date(p.fetched_at * 1000).toLocaleString()}</small></td>
+                        </tr>`;
+                    }
+                    target.innerHTML = html + '</table>';
+                }
             }
 
             async function extractAll(){
                 const res = await fetch('/api/extract-all', {method: 'POST'});
                 const data = await res.json();
-                alert(`Extrahiert: ${data.users} Users, ${data.posts} Posts`);
+                alert(`Extrahiert: ${data.users} Users, ${data.posts} Posts, ${data.profiles} Profiles`);
             }
         </script>
         <title>Cat</title>
@@ -136,6 +168,7 @@
                 |
                 <button onclick="showDataTab('users')">Users</button>
                 <button onclick="showDataTab('posts')">Posts</button>
+                <button onclick="showDataTab('profiles')">Profiles</button>
             </div>
             <div id="data-content"></div>
         </main>

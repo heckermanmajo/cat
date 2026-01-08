@@ -3,6 +3,8 @@ from typing import List
 import utils
 from .config_entry import ConfigEntry
 from .model import Model
+from .post import Post
+from .user import User
 
 class FetchTask(Model):
     """
@@ -12,11 +14,11 @@ class FetchTask(Model):
     NOTE: Skool nennt die Posts-Seite intern "community", wir nennen
     den Fetch-Typ "posts" weil es klarer ist.
     """
-    type: str = "posts" # members, one_community, one_profile, posts, likes
+    type: str = "posts" # members, posts, comments, likes, profile
     communitySlug: str = "" # always needed
     pageParam: int = 1 # might be ignored
     userSkoolHexId: str = "" # might be ignored
-    postSkoolHexId: str = "" # might be ignored
+    postSkoolHexId: str = "" # for comments/likes fetch
     communitySkoolHexId: str = "" # might be ignored
 
     @classmethod
@@ -27,15 +29,47 @@ class FetchTask(Model):
         currentCommunity = ConfigEntry.getByKey("data.current_community")
         if currentCommunity is None or currentCommunity.value.strip() == "":
             utils.err("Fetching tasks need a current community")
-        return [
-            cls({
-                "type": "members",
-                "communitySlug": "hoomans",
-                "pageParam": 1,
-            }),
-            cls({
-                "type": "posts",
-                "communitySlug": "hoomans",
-                "pageParam": 1,
-            })
+
+        slug = "hoomans"  # TODO: use currentCommunity.value
+        tasks = [
+            cls({"type": "members", "communitySlug": slug, "pageParam": 1}),
+            cls({"type": "posts", "communitySlug": slug, "pageParam": 1}),
         ]
+
+        # Comments tasks: für jeden Post mit comments > 0
+        posts_with_comments = Post.get_list(
+            "SELECT * FROM post WHERE community_slug = ? AND COALESCE(comments, 0) > 0",
+            [slug]
+        )
+        for p in posts_with_comments:
+            tasks.append(cls({
+                "type": "comments",
+                "communitySlug": slug,
+                "postSkoolHexId": p.skool_id,
+            }))
+
+        # Likes tasks: für jeden toplevel Post mit upvotes > 0
+        toplevel_with_likes = Post.get_list(
+            "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0",
+            [slug]
+        )
+        for p in toplevel_with_likes:
+            tasks.append(cls({
+                "type": "likes",
+                "communitySlug": slug,
+                "postSkoolHexId": p.skool_id,
+            }))
+
+        # Profile tasks: für jeden User
+        users = User.get_list(
+            "SELECT * FROM user WHERE community_slug = ?",
+            [slug]
+        )
+        for u in users:
+            tasks.append(cls({
+                "type": "profile",
+                "communitySlug": slug,
+                "userSkoolHexId": u.skool_id,
+            }))
+
+        return tasks

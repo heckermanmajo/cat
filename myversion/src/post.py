@@ -21,6 +21,11 @@ class Post(Model):
     skool_updated_at: str = ""
     metadata: str = ""          # JSON string (title, content, upvotes, etc.)
 
+    # Extrahiert für einfachen Zugriff
+    is_toplevel: int = 0        # 1 wenn rootId leer (kein Parent)
+    comments: int = 0           # Anzahl Kommentare (aus metadata)
+    upvotes: int = 0            # Anzahl Likes (aus metadata)
+
     # Eingebettete User-Daten (für schnellen Zugriff)
     user_name: str = ""
     user_metadata: str = ""     # JSON string
