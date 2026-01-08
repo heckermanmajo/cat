@@ -12,7 +12,7 @@ CORS(app)
 # DB init
 Model.connect('app.db')
 ConfigEntry.register(app)
-Fetch.update_table()
+Fetch.register(app)
 
 @app.route('/api/fetch-tasks')
 def get_fetch_tasks(): return jsonify([t.to_dict() for t in FetchTask.generateFetchTasks()])

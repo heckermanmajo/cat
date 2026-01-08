@@ -21,7 +21,23 @@
                 // send request to backend to generate fetch queue
                 // return is html list and then apply it to fetchqueue-target
             }
-            function requestRawData(){}
+            async function loadRawData(){
+                const res = await fetch('/api/fetch');
+                const data = await res.json();
+                const target = document.getElementById('rawdata-target');
+                if(!data.length){ target.innerHTML = '<p>Keine Fetches vorhanden</p>'; return; }
+                let html = '';
+                for (const f of data) {
+                    const raw_data = JSON.stringify(JSON.parse(f.raw_data), null, 2);
+                    html+= `<div style="border:1px solid #333; margin:5px; padding:10px;">
+                        <b>#${f.id}</b> | ${f.type} | ${f.community_slug} | page ${f.page_param} | ${f.status} |
+                        ${f.error_message ? `<br><small style="color:red">${f.error_message}</small>` : ''}
+                        <small>${new Date(f.created_at * 1000).toLocaleString()}</small>
+                        <details><summary>Raw Data</summary><pre style="max-height:200px;overflow:auto;font-size:11px">${raw_data}</pre></details>
+                    </div>`;
+                }
+                target.innerHTML = html;
+            }
         </script>
         <title>Cat</title>
     </head>
@@ -63,7 +79,8 @@
         </main>
 
         <main id="rawdata" style="display: none">
-            List of raw data
+            <button onclick="loadRawData()">Load Fetches</button>
+            <div id="rawdata-target"></div>
         </main>
 
         <main id="data" style="display: none">
