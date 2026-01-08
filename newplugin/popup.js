@@ -2,9 +2,38 @@ const loadBtn = document.getElementById('loadBtn');
 const runBtn = document.getElementById('runBtn');
 const tasksDiv = document.getElementById('tasks');
 const statusDiv = document.getElementById('status');
+let pollInterval = null;
 
 function log(msg) {
     statusDiv.textContent = msg;
+}
+
+function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(updateProgress, 1000);
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+}
+
+function updateProgress() {
+    browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
+        if (state && state.isRunning && state.totalTasks > 0) {
+            log('Fetching ' + state.currentTaskIndex + ' / ' + state.totalTasks + '...');
+        } else if (state && !state.isRunning) {
+            stopPolling();
+            if (state.results && state.results.length) {
+                renderResults(state.results);
+                log('Fertig! ' + state.results.length + ' Tasks ausgeführt');
+            }
+            runBtn.disabled = false;
+            loadBtn.disabled = false;
+        }
+    });
 }
 
 function renderTasks(tasks) {
@@ -49,11 +78,16 @@ loadBtn.onclick = function() {
 };
 
 runBtn.onclick = function() {
-    log('Starte Ausführung...');
+    log('Starte...');
     runBtn.disabled = true;
+    loadBtn.disabled = true;
+
+    // Kurz warten damit der erste Task startet, dann polling
+    setTimeout(startPolling, 500);
 
     browser.runtime.sendMessage({ type: 'RUN_TASKS' })
         .then(function(res) {
+            stopPolling();
             if (!res) {
                 log('Keine Antwort');
             } else if (res.error) {
@@ -63,10 +97,13 @@ runBtn.onclick = function() {
                 log('Fertig! ' + res.results.length + ' Tasks ausgeführt');
             }
             runBtn.disabled = false;
+            loadBtn.disabled = false;
         })
         .catch(function(e) {
+            stopPolling();
             log('Fehler: ' + e.message);
             runBtn.disabled = false;
+            loadBtn.disabled = false;
         });
 };
 
@@ -75,4 +112,12 @@ browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
     if (state && state.tasks && state.tasks.length) renderTasks(state.tasks);
     if (state && state.results && state.results.length) renderResults(state.results);
     runBtn.disabled = !(state && state.tasks && state.tasks.length);
+
+    // If currently running, show progress and start polling
+    if (state && state.isRunning) {
+        log('Fetching ' + state.currentTaskIndex + ' / ' + state.totalTasks + '...');
+        runBtn.disabled = true;
+        loadBtn.disabled = true;
+        startPolling();
+    }
 });

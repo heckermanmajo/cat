@@ -5,6 +5,7 @@ const API_URL = "http://localhost:3000";
 let tasks = [];
 let results = [];
 let isRunning = false;
+let currentTaskIndex = 0;
 
 // ============================================================================
 // API
@@ -85,9 +86,10 @@ async function executeTask(tabId, task) {
 }
 
 async function runAllTasks() {
-    if (isRunning) return;
+    if (isRunning) return { error: "Already running" };
     isRunning = true;
     results = [];
+    currentTaskIndex = 0;
 
     // Find Skool tab
     const tabs = await browser.tabs.query({ url: "https://www.skool.com/*" });
@@ -97,17 +99,21 @@ async function runAllTasks() {
     }
 
     // Execute each task
-    for (const task of tasks) {
-        const result = await executeTask(tabs[0].id, task);
-        results.push({ task, result });
-        // Delay between requests
-        await new Promise(r => setTimeout(r, 2000));
+    for (let i = 0; i < tasks.length; i++) {
+        currentTaskIndex = i + 1;
+        const result = await executeTask(tabs[0].id, tasks[i]);
+        results.push({ task: tasks[i], result });
+        // Delay between requests (5s to avoid rate limiting)
+        if (i < tasks.length - 1) {
+            await new Promise(r => setTimeout(r, 5000));
+        }
     }
 
     // Send results to server
     const serverResponse = await sendResults();
 
     isRunning = false;
+    currentTaskIndex = 0;
     return { ok: true, results, serverResponse };
 }
 
@@ -128,7 +134,7 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return true;
     }
     if (msg.type === "GET_STATE") {
-        sendResponse({ tasks, results, isRunning });
+        sendResponse({ tasks, results, isRunning, currentTaskIndex, totalTasks: tasks.length });
         return true;
     }
 });
