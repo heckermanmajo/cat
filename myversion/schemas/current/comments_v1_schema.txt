@@ -1,0 +1,100 @@
+{
+  "post_tree":   {
+    "children":     [
+      {
+        "post":         {
+          "id":           string
+          "metadata":           {
+            "action":             integer
+            "attachments":             string
+            "attachments_data":             string
+            "content":             string
+            "has_new_comments":             integer
+            "last_comment":             integer
+            "upvotes":             integer
+            "video_ids":             string
+          }
+          "created_at":           string
+          "updated_at":           string
+          "group_id":           string
+          "user_id":           string
+          "post_type":           string
+          "parent_id":           string
+          "root_id":           string
+          "user":           {
+            "id":             string
+            "name":             string
+            "metadata":             {
+              "act_status":               string
+              "bio":               string
+              "last_offline":               integer
+              "link_facebook":               string
+              "link_instagram":               string
+              "link_linkedin":               string
+              "link_twitter":               string
+              "link_website":               string
+              "link_youtube":               string
+              "location":               string
+              "myers_briggs":               string
+              "picture_bubble":               string
+              "picture_profile":               string
+              "sp_data":               string
+            }
+            "created_at":             string
+            "updated_at":             string
+            "email":             string
+            "first_name":             string
+            "last_name":             string
+          }
+        }
+        "children":         [
+          {
+            "post":             {
+              "id":               string
+              "metadata":               {
+                "action":                 integer
+                "content":                 string
+                "upvotes":                 integer
+                "video_ids":                 string
+              }
+              "created_at":               string
+              "updated_at":               string
+              "group_id":               string
+              "user_id":               string
+              "post_type":               string
+              "parent_id":               string
+              "root_id":               string
+              "user":               {
+                "id":                 string
+                "name":                 string
+                "metadata":                 {
+                  "bio":                   string
+                  "last_offline":                   integer
+                  "link_facebook":                   string
+                  "link_instagram":                   string
+                  "link_linkedin":                   string
+                  "link_twitter":                   string
+                  "link_website":                   string
+                  "link_youtube":                   string
+                  "location":                   string
+                  "myers_briggs":                   string
+                  "picture_bubble":                   string
+                  "picture_profile":                   string
+                  "sp_data":                   string
+                }
+                "created_at":                 string
+                "updated_at":                 string
+                "email":                 string
+                "first_name":                 string
+                "last_name":                 string
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+  "pinned_post_tree":   {
+  }
+  "last":   integer
+}

@@ -1,0 +1,10 @@
+{
+  "is_showing":   boolean
+  "rank":   integer
+  "category":   {
+    "id":     string
+    "name":     string
+  }
+  "category_rank":   integer
+  "language_code":   string
+}

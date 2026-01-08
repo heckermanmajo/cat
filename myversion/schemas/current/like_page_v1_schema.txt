@@ -1,0 +1,32 @@
+{
+  "tab":   string
+  "users":   [
+    {
+      "id":       string
+      "name":       string
+      "metadata":       {
+        "bio":         string
+        "chat_request":         integer
+        "last_offline":         integer
+        "link_facebook":         string
+        "link_instagram":         string
+        "link_linkedin":         string
+        "link_twitter":         string
+        "link_website":         string
+        "link_youtube":         string
+        "location":         string
+        "picture_bubble":         string
+        "picture_profile":         string
+        "sp_data":         string
+      }
+      "created_at":       string
+      "updated_at":       string
+      "email":       string
+      "first_name":       string
+      "last_name":       string
+    }
+  ]
+  "has_more":   boolean
+  "total_upvote_users":   integer
+  "total_downvote_users":   integer
+}
