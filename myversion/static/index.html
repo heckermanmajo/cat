@@ -1,0 +1,40 @@
+<html>
+    <head>
+        <script src="entity.js"></script>
+        <script src="/entities/config_entry.js"></script>
+        <script src="/lib.js"></script>
+        <link href="/default.css" type="text/css" rel="stylesheet">
+        <script>
+            window.onload = async () => {
+               lib.setupThemeOnLoad().then();
+            }
+        </script>
+        <title>Cat</title>
+    </head>
+    <body>
+
+        <header style="height: 30px">
+
+            <nav style="float: right">
+                <select id="themeSelection" onchange="setTheme(this.value).then()">
+                    <option value="blue"> Blue </option>
+                    <option value="red"> Red </option>
+                </select>
+            </nav>
+
+        </header>
+    
+        <main>
+            <article style="margin-left: 20%; margin-right: 20%; text-align: center;">
+                <h1>CAT KNOWS</h1>
+                <input placeholder="Access Key">
+                <button>
+                    <a href="/members.html"> Apply Key </a>
+                </button>
+                <br>
+                <small style="margin-top: 5px;margin-bottom: 5px;">We sent you an access key in your Skool-Mesages ... </small>
+                <br>
+            </article>
+        </main>
+    </body>
+</html>

@@ -1,0 +1,119 @@
+<html>
+    <head>
+        <script src="entity.js"></script>
+        <script src="/entities/config_entry.js"></script>
+        <script src="/lib.js"></script>
+        <link href="/default.css" type="text/css" rel="stylesheet">
+        <script>
+
+            // current filter selected in members view
+            const currentFilterMemberFilterKey = "members.current_filter";
+
+            let changeCurrentCommunity = (community) => {
+                ConfigEntry.set("current_community", community).then(() => {
+                    window.location.reload();
+                });
+            };
+            let getCurrentCommunity = async () => await ConfigEntry.get("current_community");
+            let communityListData = [];
+            let currentCommunity = "";
+            window.onload = async () => {
+                lib.setupThemeOnLoad().then();
+                currentCommunity = await getCurrentCommunity();
+                communityListData = await lib.loadAllCommunities();
+                {
+                    const currentCommunitySelectorHeader = document.getElementById("currentCommunitySelectorHeader");
+                    for (let community of communityListData) {
+                        const option = document.createElement("option");
+                        if (community === currentCommunity) option.selected = true;
+                        option.value = community;
+                        option.innerText = community;
+                        currentCommunitySelectorHeader.appendChild(option);
+                    }
+                }
+            }
+
+        </script>
+        <title>Cat</title>
+    </head>
+    <body>
+
+        <header style="height: 30px">
+
+            <select id="viewSelection" onchange="window.location.href=this.value">
+                <option value="/members.html" selected> MEMBERS </option>
+                <option value="/posts.html"> POSTS </option>
+                <option value="/communities.html"> COMMUNITIES </option>
+                <option value="/chats.html" > CHATS </option>
+                <option value="/prompts.html"> PROMPTS </option>
+                <option value="/data.html"> DATABASE </option>
+            </select>
+            |
+            Total: <b id="memberAmount">123</b>
+            |
+            <button> + Add Filter </button>
+            |
+            <select>
+                <option>LIST VIEW</option>
+                <option>TABLE VIEW</option>
+                <option>GRAPH VIEW</option>
+                <option>ACTIVITY VIEW</option>
+            </select>
+            |
+            <small>Actions:</small>
+
+            <button>Posts</button>
+            <button>Communities</button>
+            <button>Export</button>
+
+            <nav style="float: right">
+
+                <select id="currentCommunitySelectorHeader" onchange="changeCurrentCommunity(this.value)"></select>
+
+                <button onclick="window.location.href='/settings.html'"> Settings </button>
+                <select id="themeSelection" onchange="lib.setTheme(this.value).then()">
+                    <option value="blue"> Blue </option>
+                    <option value="red"> Red </option>
+                </select>
+            </nav>
+
+        </header>
+
+        <article>
+            <input placeholder="Search for members...">
+            <select>
+                <option>Sort by...</option>
+            </select>
+            <select>
+                <option>Active in last...</option>
+            </select>
+            <select>
+                <option>Inactive since...</option>
+            </select>
+            <select>
+                <option>Min other Communities</option>
+            </select>
+            <select>
+                <option>Min percentile interactions</option>
+            </select>
+            <br>
+            Include: <button>+</button>
+            Exclude: <button>+</button>
+        </article>
+
+        <main style=" display: flex; flex-wrap: wrap;">
+            <div style="flex-grow: 1;">
+                <article style="text-align: center;">
+                    <h1>Members</h1>
+                </article>
+            </div>
+            <div style="flex-grow: 1;">
+                <article>
+                    VIEW
+                </article>
+            </div>
+
+
+        </main>
+    </body>
+</html>

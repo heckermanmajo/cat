@@ -1,0 +1,41 @@
+<html>
+    <head>
+        <script src="entity.js"></script>
+        <script src="/entities/config_entry.js"></script>
+        <script src="/lib.js"></script>
+        <link href="/default.css" type="text/css" rel="stylesheet">
+        <script>
+            window.onload = async () => {
+               lib.setupThemeOnLoad().then();
+            }
+        </script>
+        <title>Cat</title>
+    </head>
+    <body>
+
+        <header style="height: 30px">
+
+            <select id="viewSelection" onchange="window.location.href=this.value">
+                <option value="/members.html"> MEMBERS </option>
+                <option value="/posts.html" selected> POSTS </option>
+                <option value="/communities.html"> COMMUNITIES </option>
+                <option value="/chats.html" > CHATS </option>
+                <option value="/prompts.html"> PROMPTS </option>
+            </select>
+
+            <nav style="float: right">
+                <select id="themeSelection" onchange="setTheme(this.value).then()">
+                    <option value="blue"> Blue </option>
+                    <option value="red"> Red </option>
+                </select>
+            </nav>
+
+        </header>
+
+        <main>
+            <article style="margin-left: 20%; margin-right: 20%; text-align: center;">
+                <h1>POSTS Coming soon...</h1>
+            </article>
+        </main>
+    </body>
+</html>

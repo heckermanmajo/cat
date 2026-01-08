@@ -2,7 +2,7 @@
 # Start CatKnows Python Version
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PYVERSION_DIR="$SCRIPT_DIR/pyversion"
+PYVERSION_DIR="$SCRIPT_DIR/myversion"
 
 cd "$PYVERSION_DIR"
 

@@ -1,0 +1,75 @@
+<html>
+    <head>
+        <script src="entity.js"></script>
+        <script src="/entities/config_entry.js"></script>
+        <script src="/lib.js"></script>
+        <link href="/default.css" type="text/css" rel="stylesheet">
+        <script>
+            let currentView = "fetchqueue";
+            window.onload = async () => {
+               lib.setupThemeOnLoad().then();
+               currentView = (await ConfigEntry.get('data.currentView') ) || currentView;
+               nav(currentView);
+            }
+            function nav(path){
+                ConfigEntry.set('data.currentView', path).then();
+                document.querySelectorAll("main").forEach((el) => el.style.display = 'none' );
+                let el = document.getElementById(path)
+                el.style.display = 'block';
+            }
+            function generateQueue(){
+                // send request to backend to generate fetch queue
+                // return is html list and then apply it to fetchqueue-target
+            }
+            function requestRawData(){}
+        </script>
+        <title>Cat</title>
+    </head>
+    <body>
+
+        <header style="height: 30px">
+
+            <select id="viewSelection" onchange="window.location.href=this.value">
+                <option value="/members.html"> MEMBERS </option>
+                <option value="/posts.html"> POSTS </option>
+                <option value="/communities.html"> COMMUNITIES </option>
+                <option value="/chats.html" > CHATS </option>
+                <option value="/prompts.html"> PROMPTS </option>
+                <option value="/data.html" selected> DATABASE </option>
+            </select>
+
+            <button onclick="nav('fetchqueue')"> Fetch-Queue </button>
+            <button onclick="nav('rawdata')"> Raw Data </button>
+            <button onclick="nav('data')"> Data </button>
+
+            <nav style="float: right">
+                <select>
+                    <option>Community name1</option>
+                    <option>Community name2</option>
+                    <option>Community name3</option>
+                    <option>Community name4</option>
+                </select>
+                <select id="themeSelection" onchange="setTheme(this.value).then()">
+                    <option value="blue"> Blue </option>
+                    <option value="red"> Red </option>
+                </select>
+            </nav>
+
+        </header>
+
+        <main id="fetchqueue" style="display: none">
+            <button onclick="generateQueue()">Generate QUEUE</button>
+            <div id='fetchqueue-target'></div>
+        </main>
+
+        <main id="rawdata" style="display: none">
+            List of raw data
+        </main>
+
+        <main id="data" style="display: none">
+            List of data
+            <button>Calculate Data from raw fetches</button>
+        </main>
+
+    </body>
+</html>

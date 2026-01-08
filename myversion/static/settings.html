@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <script src="entity.js"></script>
+        <script src="/entities/config_entry.js"></script>
+        <script src="/lib.js"></script>
+        <link href="/default.css" type="text/css" rel="stylesheet">
+        <script>
+            const communitiesKey = "communities";
+            let communityListData = [];
+            window.onload = async () => {
+                lib.setupThemeOnLoad().then();
+                communityListData = await lib.loadAllCommunities();
+                {
+                    let index = 0;
+                    for (let community of communityListData) {
+                        const html = `
+                            <input
+                                oninput="updateCommunity(${index})"
+                                id="communityInput-${index}" type="text"
+                                value="${community}" placeholder="Community name ...">`;
+                        listOfCommunityInputs.insertAdjacentHTML("beforeend", html);
+                        index++;
+                    }
+                }
+            }
+            let updateCommunity = (index) => {
+                const input = document.getElementById(`communityInput-${index}`);
+                communityListData[index] = input.value;
+                let dataAsString = JSON.stringify(communityListData)
+                ConfigEntry.set(communitiesKey, dataAsString).then();
+            }
+            let addCommunity = () => {
+                const html = `
+                    <input
+                        oninput="updateCommunity(${communityListData.length})"
+                        id="communityInput" type="text"
+                        value="" placeholder="Community name ...">`;
+                listOfCommunityInputs.insertAdjacentHTML("beforeend", html);
+                communityListData.push("");
+            }
+        </script>
+        <title>Cat</title>
+    </head>
+    <body>
+
+        <header style="height: 30px">
+            <button onclick="window.location.href='/members.html'"> BACK </button>
+        </header>
+
+        <main>
+
+            <article id="listOfCommunityInputs">
+                <button onclick="addCommunity()"> Add new Community </button>
+            </article>
+
+        </main>
+
+    </body>
+</html>

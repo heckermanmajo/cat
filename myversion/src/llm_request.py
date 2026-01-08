@@ -1,0 +1,2 @@
+class LLMRequest:
+    endpoints = {}

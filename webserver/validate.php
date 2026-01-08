@@ -1,129 +1,71 @@
 <?php
-/**
- * Lizenz-Validierung API
- *
- * POST /validate.php
- *
- * Request:
- * {
- *   "license_key": "ABC-123-XYZ",
- *   "nonce": "random_hex_string",
- *   "machine_id": "hashed_hardware_id"
- * }
- *
- * Response (signiert):
- * {
- *   "payload": { ... },
- *   "signature": "hex_encoded_ed25519_signature"
- * }
- */
-
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/core.php';
+setupDB();
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
-// Preflight für CORS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
-// Nur POST erlaubt
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    jsonError('method_not_allowed', 405);
+if($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['error' => 'method_not_allowed']);
+    exit;
 }
 
-// Input parsen
-$input = json_decode(file_get_contents('php://input'), true);
-if (!$input) {
-    jsonError('invalid_json');
-}
-
-$licenseKey = $input['license_key'] ?? '';
+$input = json_decode(file_get_contents('php://input'), true) ?: [];
+$key = $input['license_key'] ?? '';
 $nonce = $input['nonce'] ?? '';
 $machineId = $input['machine_id'] ?? '';
 
-// Validierung
-if (empty($licenseKey) || empty($nonce)) {
-    jsonError('missing_parameters');
+if(!$key || !$nonce) {
+    echo json_encode(['error' => 'missing_parameters']);
+    exit;
 }
 
-// Nonce-Format prüfen (64 hex chars = 32 bytes)
-if (!preg_match('/^[a-f0-9]{64}$/i', $nonce)) {
-    jsonError('invalid_nonce_format');
+$licenses = Model::getList(License::class, "SELECT * FROM license WHERE license_key = ?", [$key]);
+$license = $licenses[0] ?? null;
+
+$payload = ['valid' => false, 'nonce' => $nonce, 'timestamp' => time()];
+
+if(!$license) {
+    $payload['error'] = 'invalid_license';
+} elseif(!$license->is_active) {
+    $payload['error'] = 'license_deactivated';
+} elseif($license->isExpired()) {
+    $payload['error'] = 'license_expired';
+} else {
+    $payload['valid'] = true;
+    $payload['expires_at'] = date('Y-m-d', $license->valid_until);
+    $payload['features'] = $license->getFeatures();
+
+    $license->last_check = time();
+    Model::save($license);
+
+    if($machineId) {
+        $existing = Model::getList(Activation::class, "SELECT * FROM activation WHERE license_id = ? AND machine_id = ?", [$license->id, $machineId]);
+        if($existing) {
+            $existing[0]->last_seen = time();
+            Model::save($existing[0]);
+        } else {
+            $a = new Activation();
+            $a->license_id = $license->id;
+            $a->machine_id = $machineId;
+            $a->last_seen = time();
+            Model::save($a);
+        }
+    }
 }
 
-try {
-    $pdo = getDBConnection();
-
-    // Lizenz in DB suchen
-    $stmt = $pdo->prepare('
-        SELECT id, license_key, customer_email, product, valid_until,
-               is_active, max_activations, current_activations, features
-        FROM licenses
-        WHERE license_key = ?
-    ');
-    $stmt->execute([$licenseKey]);
-    $license = $stmt->fetch();
-
-    if (!$license) {
-        $payload = createLicensePayload(false, null, $nonce, 'invalid_license');
-        echo json_encode(signLicenseResponse($payload));
-        exit;
-    }
-
-    if (!$license['is_active']) {
-        $payload = createLicensePayload(false, $license['valid_until'], $nonce, 'license_deactivated');
-        echo json_encode(signLicenseResponse($payload));
-        exit;
-    }
-
-    // Ablaufdatum prüfen
-    $expiresAt = new DateTime($license['valid_until']);
-    $now = new DateTime();
-
-    if ($expiresAt < $now) {
-        $payload = createLicensePayload(false, $license['valid_until'], $nonce, 'license_expired');
-        echo json_encode(signLicenseResponse($payload));
-        exit;
-    }
-
-    // Last-Check updaten
-    $pdo->prepare('UPDATE licenses SET last_check = NOW() WHERE id = ?')
-        ->execute([$license['id']]);
-
-    // Machine-Aktivierung tracken
-    if (!empty($machineId)) {
-        $stmt = $pdo->prepare('
-            INSERT INTO activations (license_id, machine_id, activated_at, last_seen)
-            VALUES (?, ?, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE last_seen = NOW()
-        ');
-        $stmt->execute([$license['id'], $machineId]);
-    }
-
-    // Features parsen
-    $features = [];
-    if (!empty($license['features'])) {
-        $features = json_decode($license['features'], true) ?: [];
-    }
-
-    // Erfolgreiche Validierung
-    $payload = createLicensePayload(
-        true,
-        $license['valid_until'],
-        $nonce,
-        null,
-        $license['product'] ?? 'catknows',
-        $features
-    );
-
-    echo json_encode(signLicenseResponse($payload));
-
-} catch (Exception $e) {
-    error_log('License validation error: ' . $e->getMessage());
-    jsonError('server_error', 500);
+// Sign response if keys configured
+if(strlen(LICENSE_PRIVATE_KEY) === 128) {
+    $payloadJson = json_encode($payload);
+    $signature = sodium_crypto_sign_detached($payloadJson, sodium_hex2bin(LICENSE_PRIVATE_KEY));
+    echo json_encode(['payload' => $payload, 'signature' => sodium_bin2hex($signature)]);
+} else {
+    echo json_encode($payload);
 }

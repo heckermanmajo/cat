@@ -1,0 +1,10 @@
+@font-face { font-family: 'font'; src: url('/inter.ttf'); }
+html,body{ color: whitesmoke; background-color: #1c1c1c; font-family: font;padding: 0; margin: 0;}
+body>header {background-color: #2d2d2d;padding: 10px;margin-bottom:10px}
+input::placeholder { color: darkgray; }
+select, input, button {padding: 6px 12px; background-color: #1c1c1c; cursor: pointer; border-width: 1px; border-color: #374151;border-radius: 6px 6px; }
+select:hover,button:hover, input:hover {background-color: #3f3d3d;}
+article{ background-color: #2d2d2d; border-style: solid; border-width: 1px; border-color: #374151;border-radius: 4px 4px;padding-left: 6px; padding-right: 6px;margin: 4px;}
+a{text-decoration: none;}
+small{color: #777d86;display: inline-block;}
+label{background-color: #2d2d2d;}
