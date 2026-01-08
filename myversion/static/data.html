@@ -38,6 +38,53 @@
                 }
                 target.innerHTML = html;
             }
+
+            async function showDataTab(tab){
+                const target = document.getElementById('data-content');
+                if(tab === 'users'){
+                    const res = await fetch('/api/user');
+                    const data = await res.json();
+                    if(!data.length){ target.innerHTML = '<p>Keine Users vorhanden</p>'; return; }
+                    let html = '<table><tr><th>ID</th><th>Skool ID</th><th>Name</th><th>Email</th><th>Role</th><th>Community</th><th>Fetched</th></tr>';
+                    for (const u of data) {
+                        html += `<tr>
+                            <td>${u.id}</td>
+                            <td><small>${u.skool_id}</small></td>
+                            <td>${u.name}</td>
+                            <td>${u.email}</td>
+                            <td>${u.member_role}</td>
+                            <td>${u.community_slug}</td>
+                            <td><small>${new Date(u.fetched_at * 1000).toLocaleString()}</small></td>
+                        </tr>`;
+                    }
+                    target.innerHTML = html + '</table>';
+                }
+                if(tab === 'posts'){
+                    const res = await fetch('/api/post');
+                    const data = await res.json();
+                    if(!data.length){ target.innerHTML = '<p>Keine Posts vorhanden</p>'; return; }
+                    let html = '<table><tr><th>ID</th><th>Skool ID</th><th>Title</th><th>Author</th><th>Type</th><th>Community</th><th>Fetched</th></tr>';
+                    for (const p of data) {
+                        const meta = p.metadata ? JSON.parse(p.metadata) : {};
+                        html += `<tr>
+                            <td>${p.id}</td>
+                            <td><small>${p.skool_id}</small></td>
+                            <td>${meta.title || p.name}</td>
+                            <td>${p.user_name}</td>
+                            <td>${p.post_type}</td>
+                            <td>${p.community_slug}</td>
+                            <td><small>${new Date(p.fetched_at * 1000).toLocaleString()}</small></td>
+                        </tr>`;
+                    }
+                    target.innerHTML = html + '</table>';
+                }
+            }
+
+            async function extractAll(){
+                const res = await fetch('/api/extract-all', {method: 'POST'});
+                const data = await res.json();
+                alert(`Extrahiert: ${data.users} Users, ${data.posts} Posts`);
+            }
         </script>
         <title>Cat</title>
     </head>
@@ -84,8 +131,13 @@
         </main>
 
         <main id="data" style="display: none">
-            List of data
-            <button>Calculate Data from raw fetches</button>
+            <div style="margin-bottom:10px">
+                <button onclick="extractAll()">Extract All</button>
+                |
+                <button onclick="showDataTab('users')">Users</button>
+                <button onclick="showDataTab('posts')">Posts</button>
+            </div>
+            <div id="data-content"></div>
         </main>
 
     </body>
