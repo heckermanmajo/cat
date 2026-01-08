@@ -8,6 +8,9 @@ class FetchTask(Model):
     """
     A list fetch task is sent to the fetching-plugin so it knows what
     to fetch from Skool. The Fetch tasks are generated on the fly.
+
+    NOTE: Skool nennt die Posts-Seite intern "community", wir nennen
+    den Fetch-Typ "posts" weil es klarer ist.
     """
     type: str = "posts" # members, one_community, one_profile, posts, likes
     communitySlug: str = "" # always needed
