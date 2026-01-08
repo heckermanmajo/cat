@@ -22,14 +22,16 @@
                 const tasks = await res.json();
                 const target = document.getElementById('fetchqueue-target');
                 if(!tasks.length){ target.innerHTML = '<p>Keine Tasks</p>'; return; }
-                let html = '<table><tr><th>Type</th><th>Community</th><th>Page</th><th>Post ID</th><th>User ID</th></tr>';
+                let html = '<table><tr><th>Type</th><th>Community</th><th>Target</th></tr>';
                 for (const t of tasks) {
+                    let target_info = '-';
+                    if (t.type === 'members' || t.type === 'posts') target_info = 'page ' + t.pageParam;
+                    else if (t.type === 'profile') target_info = '@' + t.userName;
+                    else if (t.type === 'comments' || t.type === 'likes') target_info = t.postName;
                     html += `<tr>
                         <td>${t.type}</td>
                         <td>${t.communitySlug}</td>
-                        <td>${t.pageParam || '-'}</td>
-                        <td>${t.postSkoolHexId || '-'}</td>
-                        <td>${t.userSkoolHexId || '-'}</td>
+                        <td>${target_info}</td>
                     </tr>`;
                 }
                 target.innerHTML = html + '</table>';

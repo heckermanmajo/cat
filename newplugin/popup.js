@@ -8,9 +8,13 @@ function log(msg) {
 }
 
 function renderTasks(tasks) {
-    tasksDiv.innerHTML = tasks.map(t =>
-        '<div class="task">' + t.type + ': ' + t.communitySlug + ' (page ' + t.pageParam + ')</div>'
-    ).join('');
+    tasksDiv.innerHTML = tasks.map(t => {
+        let info = t.communitySlug;
+        if (t.type === 'profile') info += ' @' + t.userName;
+        else if (t.type === 'comments' || t.type === 'likes') info += ' ' + t.postName;
+        else info += ' (page ' + t.pageParam + ')';
+        return '<div class="task">' + t.type + ': ' + info + '</div>';
+    }).join('');
 }
 
 function renderResults(results) {

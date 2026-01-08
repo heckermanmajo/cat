@@ -17,9 +17,10 @@ class FetchTask(Model):
     type: str = "posts" # members, posts, comments, likes, profile
     communitySlug: str = "" # always needed
     pageParam: int = 1 # might be ignored
-    userSkoolHexId: str = "" # might be ignored
+    userSkoolHexId: str = "" # for profile fetch
+    userName: str = "" # for profile fetch URL
     postSkoolHexId: str = "" # for comments/likes fetch
-    communitySkoolHexId: str = "" # might be ignored
+    postName: str = "" # for comments/likes fetch URL
 
     @classmethod
     def generateFetchTasks(cls) -> List["FetchTask"]:
@@ -46,6 +47,7 @@ class FetchTask(Model):
                 "type": "comments",
                 "communitySlug": slug,
                 "postSkoolHexId": p.skool_id,
+                "postName": p.name,  # slug für URL
             }))
 
         # Likes tasks: für jeden toplevel Post mit upvotes > 0
@@ -58,6 +60,7 @@ class FetchTask(Model):
                 "type": "likes",
                 "communitySlug": slug,
                 "postSkoolHexId": p.skool_id,
+                "postName": p.name,  # slug für URL
             }))
 
         # Profile tasks: für jeden User
@@ -70,6 +73,7 @@ class FetchTask(Model):
                 "type": "profile",
                 "communitySlug": slug,
                 "userSkoolHexId": u.skool_id,
+                "userName": u.name,  # username für URL
             }))
 
         return tasks

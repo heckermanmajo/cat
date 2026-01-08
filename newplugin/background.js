@@ -58,6 +58,15 @@ async function executeTask(tabId, task) {
                 url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + "/-/members.json?t=active&p=" + task.pageParam + "&group=" + task.communitySlug;
             } else if (task.type === "posts") {
                 url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + ".json?s=newest&p=" + task.pageParam;
+            } else if (task.type === "profile") {
+                // Profile page: /@username?group=communitySlug
+                url = "https://www.skool.com/_next/data/" + buildId + "/@" + task.userName + ".json?group=" + task.communitySlug;
+            } else if (task.type === "comments") {
+                // Post detail page contains comments
+                url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + "/" + task.postName + ".json?group=" + task.communitySlug + "&p=" + task.postName;
+            } else if (task.type === "likes") {
+                // Likes API endpoint
+                url = "https://www.skool.com/api/post/" + task.postSkoolHexId + "/votes?tab=upvotes";
             } else {
                 return { error: "Unknown task type: " + task.type };
             }
