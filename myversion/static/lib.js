@@ -49,3 +49,25 @@ lib.addEventHandlerToCloseDialogByClickingOutside = (dialogElement) => {
         if (!clickedInDialog) dialogElement.close();
     });
 }
+
+// Error Dialog
+lib.errorDialog = null;
+lib.showError = function(title, message) {
+    console.error(`[ERROR] ${title}:`, message);
+    if (!lib.errorDialog) {
+        lib.errorDialog = document.createElement('dialog');
+        lib.errorDialog.innerHTML = `
+            <h3 id="errTitle" style="color:crimson"></h3>
+            <pre id="errMsg" style="max-width:500px;max-height:300px;overflow:auto"></pre>
+            <button onclick="this.closest('dialog').close()">OK</button>
+        `;
+        document.body.appendChild(lib.errorDialog);
+    }
+    lib.errorDialog.querySelector('#errTitle').textContent = title;
+    lib.errorDialog.querySelector('#errMsg').textContent = String(message);
+    lib.errorDialog.showModal();
+};
+
+// Global error handlers
+window.onerror = (msg, src, line) => lib.showError('JS Error', `${msg}\n${src}:${line}`);
+window.onunhandledrejection = (e) => lib.showError('Promise Error', e.reason);

@@ -4,3 +4,4 @@ venv/
 .idea/
 myversion/tmp/
 **/**.db
+**/catknows

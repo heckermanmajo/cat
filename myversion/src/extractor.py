@@ -47,6 +47,8 @@ def _extract_users(fetch: Fetch) -> int:
 
     for u in users_raw:
         member = u.get('member', {})
+        meta = u.get('metadata', {})
+        member_meta = member.get('metadata', {})
         user = User({
             'fetch_id': fetch.id,
             'fetched_at': now,
@@ -58,14 +60,18 @@ def _extract_users(fetch: Fetch) -> int:
             'last_name': u.get('lastName', ''),
             'skool_created_at': u.get('createdAt', ''),
             'skool_updated_at': u.get('updatedAt', ''),
-            'metadata': json.dumps(u.get('metadata', {})),
+            'metadata': json.dumps(meta),
             'member_id': member.get('id', ''),
             'member_role': member.get('role', ''),
             'member_group_id': member.get('groupId', ''),
             'member_created_at': member.get('createdAt', ''),
-            'member_metadata': json.dumps(member.get('metadata', {})),
+            'member_metadata': json.dumps(member_meta),
+            'picture_url': meta.get('picture', ''),
+            'bio': meta.get('bio', ''),
+            'points': member_meta.get('points', 0) or 0,
+            'level': member_meta.get('level', 0) or 0,
             'last_active': member.get('lastOffline', ''),
-            'is_online': u.get('metadata', {}).get('online', 0) or 0,
+            'is_online': meta.get('online', 0) or 0,
         })
         user.save()
         count += 1

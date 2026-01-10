@@ -7,7 +7,11 @@ async function api(method, url, body = null) {
     try {
         const res = await fetch(url, opts);
         const text = await res.text();
-        if (!res.ok) { console.error(`[API] ${res.status}:`, text); return { ok: false, status: res.status, error: text }; }
+        if (!res.ok) {
+            console.error(`[API] ${res.status}:`, text);
+            if(typeof lib !== 'undefined') lib.showError(`API Error ${res.status}`, text);
+            return { ok: false, status: res.status, error: text };
+        }
         try {
             const data = text ? JSON.parse(text) : null;
             console.log(`[API] Response:`, data);
@@ -18,6 +22,7 @@ async function api(method, url, body = null) {
         }
     } catch (e) {
         console.error(`[API] Network error:`, e.message);
+        if(typeof lib !== 'undefined') lib.showError('Network Error', e.message);
         return { ok: false, status: 0, error: e.message };
     }
 }

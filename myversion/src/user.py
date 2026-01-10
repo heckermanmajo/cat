@@ -1,4 +1,6 @@
 from model import Model
+from src.config_entry import ConfigEntry
+
 
 class User(Model):
     """
@@ -26,6 +28,47 @@ class User(Model):
     member_created_at: str = ""
     member_metadata: str = ""   # JSON string
 
+    # Extrahierte Felder aus metadata
+    picture_url: str = ""       # Profilbild-URL
+    bio: str = ""               # Bio-Text
+
+    # Extrahierte Felder aus member_metadata
+    points: int = 0             # Gamification-Punkte
+    level: int = 0              # Level in der Community
+
     # Activity
     last_active: str = ""       # ISO timestamp from member.lastOffline
     is_online: int = 0          # 1 = currently online
+
+    @classmethod
+    def all(cls, order: str = 'id DESC') -> list['User']:
+        """
+        SELECT *
+            FROM (
+                SELECT
+                    us.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY platform_user_id
+                        ORDER BY created_at DESC
+                    ) AS rn
+                FROM user_snapshots us
+            )
+            WHERE rn = 1;
+
+        """
+        sql = f"""
+            SELECT *
+                FROM (
+                    SELECT
+                        us.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY community_slug, skool_id
+                            ORDER BY created_at DESC
+                        ) AS rn
+                    FROM {cls.__name__.lower()} us
+                    WHERE community_slug = ?
+                )
+            WHERE rn = 1;
+        """
+        communitySlug = ConfigEntry.getByKey('current_community')
+        return cls.get_list(sql,[communitySlug.value])

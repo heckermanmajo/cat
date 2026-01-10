@@ -9,10 +9,10 @@ from .user import User
 
 
 class FetchStaleInformation:
-    """Stale-Zeiten in Stunden."""
+    """Stale-Zeiten in Stunden. Namen müssen mit fetch type übereinstimmen."""
     POSTS = 24
     MEMBERS = 24
-    PROFILES = 7 * 24
+    PROFILE = 7 * 24   # singular, wie der fetch type
     COMMENTS = 7 * 24
     LIKES = 7 * 24
 
@@ -72,6 +72,16 @@ class FetchTask(Model):
     @staticmethod
     def _has_valid_fetch(fetch_type: str, slug: str, **kwargs) -> bool:
         return FetchTask._get_valid_fetch(fetch_type, slug, **kwargs) is not None
+
+    @staticmethod
+    def _get_valid_fetch_ids(fetch_type: str, slug: str, id_column: str) -> set:
+        """Lädt alle IDs mit gültigen Fetches in ein Set (bulk statt N+1)."""
+        threshold = FetchTask._stale_threshold(fetch_type)
+        rows = Fetch.get_list(
+            f"SELECT {id_column} FROM fetch WHERE type = ? AND community_slug = ? AND status = 'ok' AND created_at > ?",
+            [fetch_type, slug, threshold]
+        )
+        return {getattr(r, id_column) for r in rows}
 
     @staticmethod
     def _get_total_pages(fetch_type: str, slug: str) -> int:
@@ -134,6 +144,7 @@ class FetchTask(Model):
         tasks = []
         now = time.time()
         cutoff = now - (FetchStaleInformation.MAX_USER_INACTIVE_DAYS * 86400)
+        valid_ids = cls._get_valid_fetch_ids('profile', slug, 'user_skool_id')
 
         users = User.get_list("SELECT * FROM user WHERE community_slug = ?", [slug])
         for u in users:
@@ -147,7 +158,7 @@ class FetchTask(Model):
                 except:
                     pass
 
-            if not cls._has_valid_fetch('profile', slug, user_id=u.skool_id):
+            if u.skool_id not in valid_ids:
                 tasks.append(cls({
                     "type": "profile",
                     "communitySlug": slug,
@@ -162,6 +173,7 @@ class FetchTask(Model):
         tasks = []
         now = time.time()
         cutoff = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)
+        valid_ids = cls._get_valid_fetch_ids('comments', slug, 'post_skool_id')
 
         posts = Post.get_list(
             "SELECT * FROM post WHERE community_slug = ? AND COALESCE(comments, 0) > 0",
@@ -178,7 +190,7 @@ class FetchTask(Model):
                 except:
                     pass
 
-            if not cls._has_valid_fetch('comments', slug, post_id=p.skool_id):
+            if p.skool_id not in valid_ids:
                 tasks.append(cls({
                     "type": "comments",
                     "communitySlug": slug,
@@ -193,6 +205,7 @@ class FetchTask(Model):
         tasks = []
         now = time.time()
         cutoff = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)
+        valid_ids = cls._get_valid_fetch_ids('likes', slug, 'post_skool_id')
 
         posts = Post.get_list(
             "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0",
@@ -209,7 +222,7 @@ class FetchTask(Model):
                 except:
                     pass
 
-            if not cls._has_valid_fetch('likes', slug, post_id=p.skool_id):
+            if p.skool_id not in valid_ids:
                 tasks.append(cls({
                     "type": "likes",
                     "communitySlug": slug,

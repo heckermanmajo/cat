@@ -22,7 +22,7 @@
                 const tasks = await res.json();
                 const target = document.getElementById('fetchqueue-target');
                 if(!tasks.length){ target.innerHTML = '<p>Keine Tasks</p>'; return; }
-                let html = '<table><tr><th>Type</th><th>Community</th><th>Page</th><th>User Skool ID</th><th>User Name</th><th>Post Skool ID</th><th>Post Name</th></tr>';
+                let html = `<b>${tasks.length} Tasks</b><br><table><tr><th>Type</th><th>Community</th><th>Page</th><th>User Skool ID</th><th>User Name</th><th>Post Skool ID</th><th>Post Name</th></tr>`;
                 for (const t of tasks) {
                     html += `<tr>
                         <td>${t.type}</td>

@@ -23,12 +23,12 @@ async function loadTasks() {
     return tasks;
 }
 
-async function sendResults() {
-    console.log('[bg] sendResults() aufgerufen');
+async function sendResult(taskResult) {
+    console.log('[bg] sendResult() aufgerufen');
     const res = await fetch(`${API_URL}/api/fetch-result`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ results })
+        body: JSON.stringify({ results: [taskResult] })
     });
     console.log('[bg] Response status:', res.status);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -98,23 +98,29 @@ async function runAllTasks() {
         return { error: "No Skool tab found" };
     }
 
-    // Execute each task
-    for (let i = 0; i < tasks.length; i++) {
-        currentTaskIndex = i + 1;
-        const result = await executeTask(tabs[0].id, tasks[i]);
-        results.push({ task: tasks[i], result });
+    // Execute tasks - reload task list after each fetch
+    while (tasks.length > 0) {
+        currentTaskIndex++;
+        const task = tasks[0];
+        const result = await executeTask(tabs[0].id, task);
+        const taskResult = { task, result };
+        results.push(taskResult);
+
+        // Send result immediately
+        await sendResult(taskResult);
+
+        // Reload tasks (server may have generated new ones)
+        await loadTasks();
+
         // Delay between requests (5s to avoid rate limiting)
-        if (i < tasks.length - 1) {
+        if (tasks.length > 0) {
             await new Promise(r => setTimeout(r, 5000));
         }
     }
 
-    // Send results to server
-    const serverResponse = await sendResults();
-
     isRunning = false;
     currentTaskIndex = 0;
-    return { ok: true, results, serverResponse };
+    return { ok: true, results };
 }
 
 // ============================================================================
