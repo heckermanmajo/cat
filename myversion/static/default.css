@@ -1,11 +1,14 @@
 @font-face { font-family: 'font'; src: url('/inter.ttf'); }
-html,body{ color: whitesmoke; background-color: #1c1c1c; font-family: font;padding: 0; margin: 0;}
+html,body{color: whitesmoke; background-color: #1c1c1c; font-family: font;padding: 0; margin: 0;}
 body>header {background-color: #2d2d2d;padding: 10px;margin-bottom:10px}
 input::placeholder { color: darkgray; }
 select, input, button {color: lightgray; font-weight: bold;padding: 6px 12px; background-color: #2d2d2d; cursor: pointer; border-width: 1px; border-color: #374151;border-radius: 6px 6px;border-style: solid; }
 select:hover,button:hover, input:hover {background-color: #3f3d3d;}
-article{ background-color: #2d2d2d; border-style: solid; border-width: 1px; border-color: #374151;border-radius: 4px 4px;padding-left: 6px; padding-right: 6px;margin: 4px;}
+article, dialog {background-color: #2d2d2d; border-style: solid; border-width: 1px; border-color: #374151;border-radius: 4px 4px;padding-left: 6px; padding-right: 6px;} article{margin: 4px;}
 a{text-decoration: none;}
+pre{overflow-wrap: break-word; !important; white-space: pre-wrap;white-space: -moz-pre-wrap;white-space: -pre-wrap;white-space: -o-pre-wrap;word-break: break-all !important;   }
 small{color: #777d86;display: inline-block;}
-input[type="checkbox"]{ accent-color:#777d86; transform:scale(1.2); background-color: #1a1a2e; }
-button>label{cursor: pointer}
+input[type="checkbox"]{ transform:scale(1.2); background-color: #1a1a2e; }
+dialog::backdrop { background: rgba(0,0,0,0.6);} body:has(dialog[open]) { overflow: hidden; } dialog{min-height: 400px;padding-top: 0px}
+label{color: whitesmoke;}
+.filter-badge {color: whitesmoke; border-style: solid; border-width: 0.5px; border-color: #6b7280; border-radius: 7px 7px;padding-left: 5px; padding-right: 5px}

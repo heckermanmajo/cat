@@ -1,4 +1,11 @@
 
+- profile detail page
+- expand post with post details
+- load scrondary view communities
+
+- members page secondary views
+- alle navigationen und aktionen als testing
+- und dann schonmal an niklas ausliefern
 
 ## Core Infrastructure
 - Accept a 'licence' key

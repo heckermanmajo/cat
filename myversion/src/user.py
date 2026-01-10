@@ -25,3 +25,7 @@ class User(Model):
     member_group_id: str = ""
     member_created_at: str = ""
     member_metadata: str = ""   # JSON string
+
+    # Activity
+    last_active: str = ""       # ISO timestamp from member.lastOffline
+    is_online: int = 0          # 1 = currently online

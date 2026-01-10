@@ -60,11 +60,6 @@ class Entity {
         return await del(`${this._endpoint}/${this.id}`);
     }
 
-    async render(mode = 'card') {
-        if (!this.id) return { ok: false, error: 'No ID' };
-        return await get(`${this._endpoint}/${this.id}/render/${mode}`);
-    }
-
     static async all() {
         const res = await get(`/api/${this._name}`);
         return res.ok ? res.data.map(d => new this(d)) : [];
@@ -73,9 +68,5 @@ class Entity {
     static async get(id) {
         const res = await get(`/api/${this._name}/${id}`);
         return res.ok ? new this(res.data) : null;
-    }
-
-    static async renderAll(mode = 'card') {
-        return await get(`/api/${this._name}/render/${mode}`);
     }
 }

@@ -1,0 +1,3 @@
+kann die ai sql schreiben?
+-> ja aber wir müssen eine  zwischen schirtt machen
+filter müssen auf sql-schnipsel gemapped werden

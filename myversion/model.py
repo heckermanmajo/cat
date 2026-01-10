@@ -9,23 +9,13 @@ _conn: sqlite3.Connection = None
 
 class Model:
     """
-        GET  /api/configentry                    → JSON array
-        GET  /api/configentry/render/card        → HTML cards
-        GET  /api/configentry/render/list        → HTML <ul>
-        GET  /api/configentry/render/text        → Textlines
-        GET  /api/configentry/render/debug       → JSON <pre>
+        GET    /api/configentry      → JSON array
+        GET    /api/configentry/5    → JSON object
+        POST   /api/configentry      → create
+        PUT    /api/configentry/5    → update
+        DELETE /api/configentry/5    → delete
 
-        GET  /api/configentry/5                  → JSON object
-        GET  /api/configentry/5/render/card      → HTML card
-        GET  /api/configentry/5/render/detail    → HTML detail
-        GET  /api/configentry/5/render/debug     → JSON <pre>
-
-        POST   /api/configentry                  → create
-        PUT    /api/configentry/5                → update
-        DELETE /api/configentry/5                → delete
-
-        Look at /static/api.js for the client side documentation.
-        NOTE: this application runs locally with aleays one user;
+        NOTE: this application runs locally with always one user;
               -> means no 'web related security risks'.
     """
     id: int = None
@@ -131,32 +121,6 @@ class Model:
         return Model.connect().execute(sql, args or []).fetchall()
 
     # =========================================================================
-    # Rendering - override in subclass for custom HTML
-    # =========================================================================
-    def render_card(self) -> str:
-        name = self.__class__.__name__
-        fields = ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in self.to_dict().items())
-        return f'<article data-id="{self.id}"><header>{name} #{self.id}</header><dl>{fields}</dl></article>'
-
-    def render_listitem(self) -> str:
-        name = self.__class__.__name__
-        preview = ', '.join(f'{k}={v}' for k, v in list(self.to_dict().items())[:3])
-        return f'<li data-id="{self.id}"><strong>{name} #{self.id}</strong> <span>{preview}</span></li>'
-
-    def render_textline(self) -> str:
-        name = self.__class__.__name__
-        preview = ', '.join(f'{k}={v}' for k, v in list(self.to_dict().items())[:3])
-        return f'<output data-id="{self.id}">{name} #{self.id}: {preview}</output>'
-
-    def render_detail(self) -> str:
-        name = self.__class__.__name__
-        fields = ''.join(f'<label><span>{k}</span><input type="text" name="{k}" value="{v}" readonly></label>' for k, v in self.to_dict().items())
-        return f'<fieldset data-id="{self.id}"><legend>{name} #{self.id}</legend>{fields}</fieldset>'
-
-    def render_debug(self) -> str:
-        return f'<code data-id="{self.id}"><pre>{json.dumps(self.to_dict(), indent=2)}</pre></code>'
-
-    # =========================================================================
     # API Routes - register with Flask app
     # =========================================================================
     @classmethod
@@ -168,30 +132,10 @@ class Model:
         def get_all():
             return jsonify([x.to_dict() for x in cls.all()])
 
-        @app.route(f'/api/{name}/render/<mode>', methods=['GET'], endpoint=f'{name}_render_all')
-        def render_all(mode):
-            items = cls.all()
-            if mode == 'card': return '\n'.join(x.render_card() for x in items)
-            if mode == 'list': return '<ul>' + '\n'.join(x.render_listitem() for x in items) + '</ul>'
-            if mode == 'text': return '\n'.join(x.render_textline() for x in items)
-            if mode == 'debug': return '\n'.join(x.render_debug() for x in items)
-            return 'Unknown render mode', 400
-
         @app.route(f'/api/{name}/<int:id>', methods=['GET'], endpoint=f'{name}_one')
         def get_one(id):
             obj = cls.by_id(id)
             return jsonify(obj.to_dict()) if obj else ('Not found', 404)
-
-        @app.route(f'/api/{name}/<int:id>/render/<mode>', methods=['GET'], endpoint=f'{name}_render_one')
-        def render_one(id, mode):
-            obj = cls.by_id(id)
-            if not obj: return 'Not found', 404
-            if mode == 'card': return obj.render_card()
-            if mode == 'detail': return obj.render_detail()
-            if mode == 'list': return obj.render_listitem()
-            if mode == 'text': return obj.render_textline()
-            if mode == 'debug': return obj.render_debug()
-            return 'Unknown render mode', 400
 
         @app.route(f'/api/{name}', methods=['POST'], endpoint=f'{name}_create')
         def create():

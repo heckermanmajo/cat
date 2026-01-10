@@ -9,6 +9,16 @@
             const communitiesKey = "communities";
             let communityListData = [];
             window.onload = async () => {
+                const allConfigEntries = await ConfigEntry.all();
+                const configEntriesList = document.getElementById("config-entries-list");
+                for (let entry of allConfigEntries) {
+                    const entryHtml = `
+                        <div>
+                            <b>${entry.key}</b>: ${entry.value}
+                        </div>
+                    `;
+                    configEntriesList.insertAdjacentHTML("beforeend", entryHtml);
+                }
                 lib.setupThemeOnLoad().then();
                 communityListData = await lib.loadAllCommunities();
                 {
@@ -52,6 +62,10 @@
 
             <article id="listOfCommunityInputs">
                 <button onclick="addCommunity()"> Add new Community </button>
+            </article>
+
+            <article id="config-entries-list">
+
             </article>
 
         </main>

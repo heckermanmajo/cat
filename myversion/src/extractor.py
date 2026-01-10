@@ -64,6 +64,8 @@ def _extract_users(fetch: Fetch) -> int:
             'member_group_id': member.get('groupId', ''),
             'member_created_at': member.get('createdAt', ''),
             'member_metadata': json.dumps(member.get('metadata', {})),
+            'last_active': member.get('lastOffline', ''),
+            'is_online': u.get('metadata', {}).get('online', 0) or 0,
         })
         user.save()
         count += 1

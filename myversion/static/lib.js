@@ -4,8 +4,17 @@ lib.setTheme = async function (themeName){
     let color = "lightseagreen";
     if (themeName === "green") color = "lightgreen";
     if (themeName === "red") color = "crimson";
-    let colorElements = "button, a, select, b, h1, h2, h3, h4, h5, h6";
-    document.querySelectorAll(colorElements).forEach(el => el.style.color = color);
+    let css = `
+        button, a, select, b, h1, h2, h3, h4, h5, h6{ color: ${color} !important; }
+        input[type="checkbox"]{ accent-color: ${color} !important;}
+    `;
+    let style = document.getElementById("dynamicThemeStyle");
+    if(!style){
+        style = document.createElement('style');
+        style.id = "dynamicThemeStyle";
+        document.head.appendChild(style);
+    }
+    style.innerHTML = css;
 };
 lib.setupThemeOnLoad = async function (){
     let themeName = await ConfigEntry.get('theme');
@@ -27,4 +36,16 @@ lib.loadAllCommunities = async () => {
     communityListData = Array.from(communityListData.filter(c => c !== ""));
     console.log("loaded communities:", communityListData);
     return communityListData;
+}
+// todo: breaks currently if we use select...
+lib.addEventHandlerToCloseDialogByClickingOutside = (dialogElement) => {
+    dialogElement.addEventListener("click", (event) => {
+        const rect = dialogElement.getBoundingClientRect();
+        const clickedInDialog =
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom;
+        if (!clickedInDialog) dialogElement.close();
+    });
 }

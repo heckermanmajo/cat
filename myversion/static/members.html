@@ -1,14 +1,94 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
+        <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
         <script src="entity.js"></script>
         <script src="/entities/config_entry.js"></script>
+        <script src="/entities/user.js"></script>
+        <script src="/entities/post.js"></script>
         <script src="/lib.js"></script>
         <link href="/default.css" type="text/css" rel="stylesheet">
+        <title>Cat</title>
         <script>
 
-            // current filter selected in members view
-            const currentFilterMemberFilterKey = "members.current_filter";
+            // =========================================================================
+            // Graph Rendering (Vis.js)
+            // =========================================================================
+            /**
+             * Rendert einen Member-Netzwerk-Graph.
+             * @param {HTMLElement} container - DOM Element für den Graph
+             * @param {Array} nodes - [{id, name, role, posts}, ...]
+             * @param {Array} edges - [{from, to, weight}, ...]
+             */
+            function renderMemberGraph(container, nodes, edges) {
+                const visNodes = nodes.map(n => ({
+                    id: n.id,
+                    label: n.name,
+                    title: `${n.name}\nRole: ${n.role}\nPosts: ${n.posts}`,
+                    value: n.posts || 1,
+                    group: n.role
+                }));
+                const visEdges = edges.map(e => ({
+                    from: e.from,
+                    to: e.to,
+                    value: e.weight || 1
+                }));
+                const data = { nodes: visNodes, edges: visEdges };
+                const options = {
+                    nodes: {
+                        shape: 'dot',
+                        scaling: { min: 10, max: 30 }
+                    },
+                    edges: {
+                        smooth: false,
+                        scaling: { min: 1, max: 5 }
+                    },
+                    physics: {
+                        stabilization: { iterations: 100 }
+                    },
+                    groups: {
+                        admin: { color: '#e74c3c' },
+                        moderator: { color: '#f39c12' },
+                        member: { color: '#3498db' }
+                    }
+                };
+                new vis.Network(container, data, options);
+            }
 
+            // Dummy-Daten für Test
+            const dummyNodes = [
+                {id: "1", name: "Max Admin", role: "admin", posts: 50},
+                {id: "2", name: "Anna Mod", role: "moderator", posts: 35},
+                {id: "3", name: "Tom Member", role: "member", posts: 20},
+                {id: "4", name: "Lisa Member", role: "member", posts: 15},
+                {id: "5", name: "Ben Member", role: "member", posts: 8},
+                {id: "6", name: "Sara Member", role: "member", posts: 5},
+            ];
+            const dummyEdges = [
+                {from: "1", to: "2", weight: 10},
+                {from: "1", to: "3", weight: 5},
+                {from: "2", to: "3", weight: 8},
+                {from: "2", to: "4", weight: 3},
+                {from: "3", to: "5", weight: 4},
+                {from: "4", to: "6", weight: 2},
+                {from: "1", to: "5", weight: 6},
+            ];
+
+            // filter
+            const membersFilterExpandedKey = "members.filter_expanded";
+            let filterExpanded = false;
+            let updateFilterToggleButton = () => {
+                if (filterExpanded) document.getElementById("hide-show-filter").innerText = "Hide Filter";
+                else document.getElementById("hide-show-filter").innerText = "Show Filter";
+            };
+            let toggleFilterExpanded = () => {
+                filterExpanded = !filterExpanded;
+                ConfigEntry.set(membersFilterExpandedKey, filterExpanded.toString()).then();
+                document.getElementById("filter").style.display = filterExpanded ? "block" : "none";
+                updateFilterToggleButton();
+            };
+
+            // community selector/selection
             let changeCurrentCommunity = (community) => {
                 ConfigEntry.set("current_community", community).then(() => {
                     window.location.reload();
@@ -17,11 +97,200 @@
             let getCurrentCommunity = async () => await ConfigEntry.get("current_community");
             let communityListData = [];
             let currentCommunity = "";
+
+            // view selector
+            const membersViewConfigKey = "members.current_view";
+            let currentView = "list";
+            let setCurrentView = (view) => {
+                currentView = view;
+                ConfigEntry.set(membersViewConfigKey, view).then();
+                renderMembersView();
+            };
+            let getCurrentView = async () => {
+                const view = await ConfigEntry.get(membersViewConfigKey);
+                if (view) currentView = view;
+            };
+
+            //
+            //
+            // region MEMBERS
+            //
+            //
+
+            // load members
+            let members = [];
+
+            const renderMembersView = () => {
+                const membersView = document.getElementById("members-view");
+                membersView.innerHTML= "";
+                const secondaryViewActions = document.getElementById("secondary-views");
+                if (currentView === 'graph') secondaryViewActions.style.display = 'none';
+                else secondaryViewActions.style.display = 'inline';
+                switch(currentView){
+                    case "list": {
+                        membersView.innerHTML = `
+                            <div style="flex-grow: 1; max-width: 50%" id="members-list" ></div>
+                            <div style="flex-grow: 1; max-width: 50%" id='secondary-view'></div>
+                        `;
+                        const membersList = document.getElementById("members-list");
+                        for (let member of members) {
+                            const asJson = JSON.stringify(member, null, 2);
+                            const memberHtml = `
+                                <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
+                                     <b>@${member.name} - ${member.first_name} ${member.last_name}</b><br>
+                                            Name: ${member.name}<br>
+                                            Last Active: ${new Date(member.lastActive * 1000).toLocaleDateString()}
+                                     </article>
+                            `;
+                            membersList.insertAdjacentHTML("beforeend", memberHtml);
+                        }
+                    }break;
+                    case "card": {
+                        membersView.innerHTML = `
+                            <div style="flex-grow: 1; max-width: 50%" id="members-list" ></div>
+                            <div style="flex-grow: 1; max-width: 50%" id='secondary-view'></div>
+                        `;
+                        const membersList = document.getElementById("members-list");
+                        for (let member of members) {
+                            const asJson = JSON.stringify(member, null, 2);
+                            const memberHtml = `
+                                <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
+                                     <b>@${member.name} - ${member.first_name} ${member.last_name}</b><br>
+                                            Name: ${member.name}<br>
+                                            Last Active: ${new Date(member.lastActive * 1000).toLocaleDateString()}
+                                            <pre>${asJson}</pre>
+                                </article>
+                            `;
+                            membersList.insertAdjacentHTML("beforeend", memberHtml);
+                        }
+                    }break;
+                    case "graph": {
+                        membersView.innerHTML = `<div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc;"></div>`;
+                        const container = document.getElementById("graph-container");
+                        renderMemberGraph(container, dummyNodes, dummyEdges);
+                    } break;
+                    default:
+                        membersView.innerHTML= "UNKNOWN VIEW -> this is a bug";
+                        break;
+                }
+            }
+
+            //
+            //
+            // region PROFILE DETAILS
+            //
+            //
+
+            // render profile details
+            let loadAndRenderProfileDetails = (memberId) => {
+                (async ()=>{
+                    const secondaryView = document.getElementById("secondary-view");
+                    secondaryView.innerHTML = `<h3>Loading...</h3>`;
+                    const user = await User.get(memberId);
+                    secondaryView.innerHTML = `<h3>Profile Details for @${user.name}</h3>`;
+                    secondaryView.innerHTML += `<pre>${JSON.stringify(user, null, 2)}</pre>`
+                    secondaryView.innerHTML += `<h4>POSTS</h4>`;
+                    secondaryView.innerHTML += `<h4>NOTES</h4> Coming soon...`;
+                    secondaryView.innerHTML += `<h4>COMMUNITIES</h4>`;
+                    secondaryView.innerHTML += `<h4>Liked POSTS</h4>`;
+                })();
+            };
+
+            //
+            //
+            // region 2. VIEW
+            //
+            //
+
+            // secondary view selector
+            const secondaryViewConfigKey = "members.secondary_view";
+            let currentSecondaryView = "posts";
+            let renderSecondaryView = () => {
+                switch(currentSecondaryView){
+                    case "posts": {
+                        (async()=>{
+                            document.getElementById('secondary-view').innerHTML = `<h3>Loading Posts...</h3>`;
+                            /** @type {Post[]} */
+                            let data = await Post.all();
+                            let html = "";
+                            for (const post of data) {
+
+                                html += `
+                                    <article>
+                                        <b>${post.name}</b> by ${post.user_name}<br>
+                                    </article>
+                                `;
+                            }
+                            document.getElementById('secondary-view').innerHTML = html;
+                        })();
+                    } break;
+                    case "communities": {
+                        document.getElementById('secondary-view').innerText = "COMMUNITIES";
+                    } break;
+                    case "export": {
+                        document.getElementById('secondary-view').innerText = "EXPORT";
+                    } break;
+                    case "activity": {
+                        document.getElementById('secondary-view').innerText = "ACTIVITY";
+                    } break;
+                    default: // posible -> not a bug
+                        document.getElementById('secondary-view').innerText = "";
+                        break;
+                }
+            };
+            let setCurrentSecondaryView = (view) => {
+                currentSecondaryView = view;
+                ConfigEntry.set(secondaryViewConfigKey, view).then();
+                renderSecondaryView();
+            };
+            let getCurrentSecondaryView = async () => {
+                const view = await ConfigEntry.get(secondaryViewConfigKey);
+                if (view) currentSecondaryView = view;
+            }
+
+            //
+            //
+            // region ONLOAD
+            //
+            //
+
+            // onload
             window.onload = async () => {
+
+                // load members
+                (async () => {
+
+                    // members view selector
+                    await getCurrentView();
+                    const select = document.getElementById("membersViewSelection");
+                    select.value = currentView;
+                    select.onchange = () => setCurrentView(select.value);
+
+                    // load members
+                    members = await User.all();
+                    document.getElementById("memberAmount").innerText = members.length.toString();
+                    renderMembersView();
+
+                    // secondary view selector
+                    await getCurrentSecondaryView();
+                    renderSecondaryView();
+
+                })().then();
+
+                //filter
+                ConfigEntry.get(membersFilterExpandedKey).then((value) => {
+                    filterExpanded = value === "true";
+                    console.log("Filter expanded loaded as: " + filterExpanded, value);
+                    document.getElementById("filter").style.display = filterExpanded ? "block" : "none";
+                    updateFilterToggleButton();
+                });
+
                 lib.setupThemeOnLoad().then();
-                currentCommunity = await getCurrentCommunity();
-                communityListData = await lib.loadAllCommunities();
+
+                // community list
                 {
+                    currentCommunity = await getCurrentCommunity();
+                    communityListData = await lib.loadAllCommunities();
                     const currentCommunitySelectorHeader = document.getElementById("currentCommunitySelectorHeader");
                     for (let community of communityListData) {
                         const option = document.createElement("option");
@@ -33,8 +302,122 @@
                 }
             }
 
+            //
+            //
+            // region FILTER STATE
+            //
+            //
+
+            // todo: load filter state from current filter, sicne once can have multiple filters
+            let filterState = {
+                sortBy: null,
+                include: {},
+                exclude: {}
+            }
+
+            let renderFilterConditions = () => {
+                let htmlInclude = '';
+                for (let key in filterState.include){
+                    switch (key){
+                        case 'active_since':
+                            let days = parseInt(filterState.include[key]);
+                            if (days !== -1) htmlInclude += `
+                                <small class='filter-badge'>Active in last ${days} days
+                                <b style="cursor: pointer" onclick="setFilterCondition('include', '${key}', -1)">X</b></small> `;
+                            continue;
+                        case 'modadmin':
+                            htmlInclude += `
+                                <small class='filter-badge'>Admins & Mods
+                                <b style="cursor: pointer" onclick="setFilterCondition('include', '${key}', -1)">X</b></small> `;
+                            continue;
+                        default:
+                            // do nothing
+                            break;
+                    }
+                }
+                document.getElementById('filter-conditions-include').innerHTML = htmlInclude;
+            };
+
+            let addActiveSinceFilterCondition = () => {
+
+            }
+
+            let setFilterCondition = (mode, key, value) => {
+                if (mode !== 'include' && mode !== 'exclude'){
+                    console.error('Unknown filter condition mode: ' + mode);
+                    return;
+                }
+                console.log(value)
+                if(value === "-1" || value === "false" || value === false || value === null || value === undefined || value === -1){
+                    delete filterState[mode][key];
+                    renderFilterConditions();
+                    return;
+                }
+                else{
+                    filterState[mode][key] = value;
+                    renderFilterConditions();
+                }
+            };
+
+            let openFilterDialog = (mode) => {
+                document.querySelectorAll('dialog').forEach(d => d.remove());
+                let dialog;
+                if (mode === 'include'){
+                    dialogHtml = `
+                        <dialog>
+                            <label>Active in last:</label>
+                            <select onchange="setFilterCondition('include','active_since', this.value)">
+                                <option value="-1"> Forever </option>
+                                <option value="5"> 5 days </option>
+                                <option value="20"> 20 days </option>
+                                <option value="90"> 3 month </option>
+                            </select>
+                            <br>
+                            <label>Inactive since...</label>
+                            <select>
+                                <option></option>
+                            </select>
+                            <br>
+                            <label>Min other Communities...</label>
+                            <select>
+                                <option>Min other Communities</option>
+                            </select>
+                            <br>
+                            <label>Min percentile interactions...</label>
+                            <select>
+                                <option>Min percentile interactions</option>
+                            </select>
+                            <br>
+                            <label> Admins & Mods </label>
+                            <input type="checkbox" ${filterState.include.modadmin?'checked':''}
+                                    onchange="setFilterCondition('include','modadmin', this.checked)">
+                            <br><br>
+                        </dialog>
+                    `;
+                }
+                else if (mode === 'exclude'){
+                    dialogHtml = `
+                        <dialog>
+                            <h4>Exclude all Members</h4>
+                        </dialog>
+                    `;
+                }
+                else { console.error('Unknown filter dialog mode: ' + mode); return;}
+                document.body.insertAdjacentHTML('beforeend', dialogHtml);
+                setTimeout(() => {
+                    const dialog = document.querySelector('dialog');
+                    //lib.addEventHandlerToCloseDialogByClickingOutside(dialog);
+                    dialog.showModal();
+                }, 100);
+            }
+
+            //
+            //
+            // region HTML
+            //
+            //
+
         </script>
-        <title>Cat</title>
     </head>
     <body>
 
@@ -49,23 +432,27 @@
                 <option value="/data.html"> DATABASE </option>
             </select>
             |
-            Total: <b id="memberAmount">123</b>
+            Total: <b id="memberAmount">---</b>
             |
-            <button> + Add Filter </button>
+            <button id="hide-show-filter" onclick="toggleFilterExpanded()"> </button>
             |
-            <select>
-                <option>LIST VIEW</option>
-                <option>TABLE VIEW</option>
-                <option>GRAPH VIEW</option>
-                <option>ACTIVITY VIEW</option>
+            <select id="membersViewSelection">
+                <option value="list">LIST VIEW</option>
+                <option value="card">CARD VIEW</option>
+                <option value="graph">GRAPH VIEW</option>
             </select>
             |
-            <small>Actions:</small>
-
-            <button>Posts</button>
-            <button>Communities</button>
-            <button>Export</button>
-
+            <!-- Secondary view are applied to the right, but only if the main view is
+            list or card view -> since on graph view there is no space for that
+            This is used to display all posts of the selected users or their communities etc.
+             -->
+            <span id="secondary-views">
+                <small>Actions:</small>
+                <button onclick="setCurrentSecondaryView('posts')">Posts</button>
+                <button onclick="setCurrentSecondaryView('communities')">Communities</button>
+                <button onclick="setCurrentSecondaryView('activity')">Activities</button>
+                <button onclick="setCurrentSecondaryView('export')">Export</button>
+            </span>
             <nav style="float: right">
 
                 <select id="currentCommunitySelectorHeader" onchange="changeCurrentCommunity(this.value)"></select>
@@ -79,41 +466,26 @@
 
         </header>
 
-        <article>
-            <input placeholder="Search for members...">
-            <select>
-                <option>Sort by...</option>
-            </select>
-            <select>
-                <option>Active in last...</option>
-            </select>
-            <select>
-                <option>Inactive since...</option>
-            </select>
-            <select>
-                <option>Min other Communities</option>
-            </select>
-            <select>
-                <option>Min percentile interactions</option>
-            </select>
-            <br>
-            Include: <button>+</button>
-            Exclude: <button>+</button>
+        <article id="filter" style="display:none">
+            <div style="margin-bottom: 5px">
+                <input placeholder="Search for members...">
+                <select>
+                    <option>Sort by...</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 5px">
+                Include: <button onclick="openFilterDialog('include')">+</button>
+                <span id="filter-conditions-include"></span>
+            </div>
+            <div>
+                Exclude: <button onclick="openFilterDialog('exclude')">+</button>
+                <span id="filter-conditions-exclude"></span>
+            </div>
+
         </article>
 
-        <main style=" display: flex; flex-wrap: wrap;">
-            <div style="flex-grow: 1;">
-                <article style="text-align: center;">
-                    <h1>Members</h1>
-                </article>
-            </div>
-            <div style="flex-grow: 1;">
-                <article>
-                    VIEW
-                </article>
-            </div>
-
-
+        <main style=" display: flex; flex-wrap: wrap; width: 100%;" id="members-view">
+            <!-- MEMBERS VIEW RENDERED HERE -->
         </main>
     </body>
 </html>
