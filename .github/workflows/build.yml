@@ -80,7 +80,7 @@ jobs:
       - name: Prepare deployment package
         run: |
           # Binary in webserver-Ordner kopieren
-          cp linux-binary/catknows webserver/catknows
+          cp linux-binary/myversion/dist/catknows webserver/catknows
           chmod +x webserver/catknows
 
           # ZIP erstellen (ohne .md und excalidraw)
