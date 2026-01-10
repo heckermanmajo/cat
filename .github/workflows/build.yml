@@ -42,15 +42,15 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-          cache-dependency-path: pyversion/requirements.txt
+          cache-dependency-path: myversion/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r pyversion/requirements.txt
+          pip install -r myversion/requirements.txt
 
       - name: Build with Nuitka
-        working-directory: pyversion
+        working-directory: myversion
         run: python build.py
 
       - name: Upload artifact
@@ -58,8 +58,8 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            pyversion/dist/catknows
-            pyversion/dist/catknows.exe
+            myversion/dist/catknows
+            myversion/dist/catknows.exe
           if-no-files-found: error
 
   deploy:

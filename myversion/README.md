@@ -1,7 +1,7 @@
 
 - profile detail page
 - expand post with post details
-- load scrondary view communities
+- load secondary view communities
 
 - members page secondary views
 - alle navigationen und aktionen als testing

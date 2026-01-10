@@ -1,4 +1,4 @@
-from .model import Model
+from model import Model
 
 class Fetch(Model):
     """
@@ -13,3 +13,6 @@ class Fetch(Model):
     raw_data: str = ""  # JSON string der Skool-Response
     status: str = "ok"  # ok, error
     error_message: str = ""
+    # Pagination (aus Response extrahiert)
+    total_items: int = 0      # total aus pageProps
+    total_pages: int = 0      # totalPages (members) oder berechnet (posts)

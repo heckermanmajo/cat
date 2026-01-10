@@ -8,7 +8,7 @@ from .fetch import Fetch
 from .user import User
 from .post import Post
 from .profile import Profile
-from .model import Model
+from model import Model
 
 def extract_from_fetch(fetch: Fetch) -> dict:
     """

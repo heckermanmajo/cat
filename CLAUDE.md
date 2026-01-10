@@ -4,7 +4,7 @@ Es läuft nur lokal und wird mit nutika zu einer EXECUTABLE compilliert.
 Es gibt also nur einen Nutzer pro instanz -> Web ist NUR unser UI framework.
 Es gibt ein Browser-PLUGIN, das die daten aus skool fetched.
 - browser-extension/ -> altes Plugin für pyversion (deprecated)
-- newplugin/ -> neues Plugin für myversion (simpel, explizit)
+- webserver/plugin/ -> aktuelles Plugin, wird vom Webserver als ZIP ausgeliefert
 Es gibt ein alte depredated variante in pyversion.
 Es gibt einen lizenz-webserver mit zwei aufgaben: EXECUTABLE ausliefern, lizenzen managen. ALLE BUSINESS LOGGIK IST IN myversion,d.h der Python code base.
 

@@ -24,6 +24,19 @@ Profile.register(app)
 @app.route('/api/fetch-tasks')
 def get_fetch_tasks(): return jsonify([t.to_dict() for t in FetchTask.generateFetchTasks()])
 
+def _extract_pagination(data: dict, fetch_type: str) -> tuple[int, int]:
+    """Extrahiert total_items und total_pages aus pageProps."""
+    pp = data.get('pageProps', {})
+    total = pp.get('total', 0) or 0
+    if fetch_type == 'members':
+        total_pages = pp.get('totalPages', 0) or 0
+    elif fetch_type == 'posts':
+        # Posts haben kein totalPages, wir berechnen es (20 items pro Seite)
+        total_pages = (total + 19) // 20 if total > 0 else 0
+    else:
+        total_pages = 0
+    return total, total_pages
+
 @app.route('/api/fetch-result', methods=['POST'])
 def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
@@ -33,15 +46,20 @@ def post_fetch_result():
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
+        data = result.get('data', {})
+        fetch_type = task.get('type', '')
+        total_items, total_pages = _extract_pagination(data, fetch_type)
         f = Fetch({
-            'type': task.get('type', ''),
+            'type': fetch_type,
             'community_slug': task.get('communitySlug', ''),
             'page_param': task.get('pageParam', 1),
             'user_skool_id': task.get('userSkoolHexId', ''),
             'post_skool_id': task.get('postSkoolHexId', ''),
             'status': 'ok' if result.get('ok') else 'error',
             'error_message': result.get('error', ''),
-            'raw_data': json.dumps(result.get('data', {}))
+            'raw_data': json.dumps(data),
+            'total_items': total_items,
+            'total_pages': total_pages,
         })
         f.save()
         saved.append(f.to_dict())
