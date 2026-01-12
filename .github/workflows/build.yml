@@ -57,9 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: |
-            myversion/dist/catknows
-            myversion/dist/catknows.exe
+          path: myversion/dist/
           if-no-files-found: error
 
   deploy:
@@ -80,7 +78,7 @@ jobs:
       - name: Prepare deployment package
         run: |
           # Binary in webserver-Ordner kopieren
-          cp linux-binary/myversion/dist/catknows webserver/catknows
+          cp linux-binary/catknows webserver/catknows
           chmod +x webserver/catknows
 
           # ZIP erstellen (ohne .md und excalidraw)
@@ -134,9 +132,9 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir release
-          cp artifacts/catknows-linux/catknows release/catknows-linux 2>/dev/null || true
-          cp artifacts/catknows-windows/catknows.exe release/catknows-windows.exe 2>/dev/null || true
-          cp artifacts/catknows-macos/catknows release/catknows-macos 2>/dev/null || true
+          cp artifacts/catknows-linux/catknows release/catknows-linux
+          cp artifacts/catknows-windows/catknows.exe release/catknows-windows.exe
+          cp artifacts/catknows-macos/catknows release/catknows-macos
           ls -la release/
 
       - name: Create Release

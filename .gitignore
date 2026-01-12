@@ -5,3 +5,4 @@ venv/
 myversion/tmp/
 **/**.db
 **/catknows
+**/**.pyc
