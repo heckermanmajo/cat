@@ -69,17 +69,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Linux binary
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: catknows-linux
-          path: linux-binary
+          path: artifacts
 
       - name: Prepare deployment package
         run: |
-          # Binary in webserver-Ordner kopieren
-          cp linux-binary/catknows webserver/catknows
-          chmod +x webserver/catknows
+          # Downloads-Ordner erstellen
+          mkdir -p webserver/downloads
+
+          # Linux: tar.gz
+          chmod +x artifacts/catknows-linux/catknows
+          tar -czvf webserver/downloads/catknows-linux.tar.gz -C artifacts/catknows-linux catknows
+
+          # Windows: exe umbenennen
+          cp artifacts/catknows-windows/catknows.exe webserver/downloads/catknows-win.exe
+
+          # macOS: zip
+          chmod +x artifacts/catknows-macos/catknows
+          zip -j webserver/downloads/catknows-mac.zip artifacts/catknows-macos/catknows
+
+          ls -la webserver/downloads/
 
           # ZIP erstellen (ohne .md und excalidraw)
           cd webserver
