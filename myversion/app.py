@@ -9,6 +9,7 @@ from src.user import User
 from src.post import Post
 from src.profile import Profile
 from src import extractor
+from src.members_filter import MembersFilter
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -83,6 +84,18 @@ def extract_all():
     """Manuell: Extrahiert aus allen Fetches."""
     result = extractor.extract_all_fetches()
     return jsonify(result)
+
+@app.route('/api/user/filter', methods=['POST'])
+def filter_users():
+    """Filter users with include/exclude conditions, search, and sorting."""
+    data = request.json or {}
+    # Add current community if not provided
+    if not data.get('communitySlug'):
+        community = ConfigEntry.getByKey('current_community')
+        data['communitySlug'] = community.value if community else ''
+    f = MembersFilter(data)
+    users = User.filtered(f)
+    return jsonify([u.to_dict() for u in users])
 
 @app.route('/')
 def index(): return send_from_directory('static', 'index.html')

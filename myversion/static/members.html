@@ -120,6 +120,34 @@
             // load members
             let members = [];
 
+            let loadMembers = async () => {
+                const res = await post('/api/user/filter', filterState);
+                if (res.ok) {
+                    members = res.data;
+                    document.getElementById("memberAmount").innerText = members.length.toString();
+                    renderMembersView();
+                }
+            };
+
+            const formatDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString() : '-';
+
+            const renderMemberCard = (member, showJson = false) => {
+                const onlineStatus = member.is_online ? '<span style="color:green">Online</span>' : '<span style="color:gray">Offline</span>';
+                return `
+                    <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
+                        <b>@${member.name}</b> - ${member.first_name} ${member.last_name} ${onlineStatus}<br>
+                        <small>
+                            Role: <b>${member.member_role || '-'}</b> |
+                            Points: <b>${member.points || 0}</b> |
+                            Level: <b>${member.level || 0}</b><br>
+                            Last Active: ${formatDate(member.last_active)} |
+                            Joined: ${formatDate(member.member_created_at)}
+                        </small>
+                        ${showJson ? `<pre>${JSON.stringify(member, null, 2)}</pre>` : ''}
+                    </article>
+                `;
+            };
+
             const renderMembersView = () => {
                 const membersView = document.getElementById("members-view");
                 membersView.innerHTML= "";
@@ -134,15 +162,7 @@
                         `;
                         const membersList = document.getElementById("members-list");
                         for (let member of members) {
-                            const asJson = JSON.stringify(member, null, 2);
-                            const memberHtml = `
-                                <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
-                                     <b>@${member.name} - ${member.first_name} ${member.last_name}</b><br>
-                                            Name: ${member.name}<br>
-                                            Last Active: ${new Date(member.lastActive * 1000).toLocaleDateString()}
-                                     </article>
-                            `;
-                            membersList.insertAdjacentHTML("beforeend", memberHtml);
+                            membersList.insertAdjacentHTML("beforeend", renderMemberCard(member, false));
                         }
                     }break;
                     case "card": {
@@ -152,16 +172,7 @@
                         `;
                         const membersList = document.getElementById("members-list");
                         for (let member of members) {
-                            const asJson = JSON.stringify(member, null, 2);
-                            const memberHtml = `
-                                <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
-                                     <b>@${member.name} - ${member.first_name} ${member.last_name}</b><br>
-                                            Name: ${member.name}<br>
-                                            Last Active: ${new Date(member.lastActive * 1000).toLocaleDateString()}
-                                            <pre>${asJson}</pre>
-                                </article>
-                            `;
-                            membersList.insertAdjacentHTML("beforeend", memberHtml);
+                            membersList.insertAdjacentHTML("beforeend", renderMemberCard(member, true));
                         }
                     }break;
                     case "graph": {
@@ -266,10 +277,8 @@
                     select.value = currentView;
                     select.onchange = () => setCurrentView(select.value);
 
-                    // load members
-                    members = await User.all();
-                    document.getElementById("memberAmount").innerText = members.length.toString();
-                    renderMembersView();
+                    // load members with filter
+                    await loadMembers();
 
                     // secondary view selector
                     await getCurrentSecondaryView();
@@ -310,32 +319,64 @@
 
             // todo: load filter state from current filter, sicne once can have multiple filters
             let filterState = {
-                sortBy: null,
+                sortBy: 'name_asc',
+                searchTerm: '',
                 include: {},
                 exclude: {}
             }
 
+            let setSort = (value) => {
+                filterState.sortBy = value;
+                loadMembers();
+            }
+
             let renderFilterConditions = () => {
-                let htmlInclude = '';
-                for (let key in filterState.include){
-                    switch (key){
-                        case 'active_since':
-                            let days = parseInt(filterState.include[key]);
-                            if (days !== -1) htmlInclude += `
-                                <small class='filter-badge'>Active in last ${days} days
-                                <b style="cursor: pointer" onclick="setFilterCondition('include', '${key}', -1)">X</b></small> `;
-                            continue;
-                        case 'modadmin':
-                            htmlInclude += `
-                                <small class='filter-badge'>Admins & Mods
-                                <b style="cursor: pointer" onclick="setFilterCondition('include', '${key}', -1)">X</b></small> `;
-                            continue;
-                        default:
-                            // do nothing
-                            break;
+                const renderBadges = (mode) => {
+                    let html = '';
+                    const state = filterState[mode] || {};
+                    for (let key in state) {
+                        const val = state[key];
+                        let label = '';
+                        switch (key) {
+                            case 'member_role':
+                                label = `Role: ${val}`;
+                                break;
+                            case 'active_since':
+                                label = `Active in last ${val} days`;
+                                break;
+                            case 'inactive_since':
+                                label = `Inactive since ${val} days`;
+                                break;
+                            case 'joined_since':
+                                label = `Joined in last ${val} days`;
+                                break;
+                            case 'joined_before':
+                                label = `Joined before ${val} days`;
+                                break;
+                            case 'points_min':
+                                label = `Points >= ${val}`;
+                                break;
+                            case 'points_max':
+                                label = `Points <= ${val}`;
+                                break;
+                            case 'level_min':
+                                label = `Level >= ${val}`;
+                                break;
+                            case 'level_max':
+                                label = `Level <= ${val}`;
+                                break;
+                            case 'is_online':
+                                label = `Online`;
+                                break;
+                            default:
+                                continue;
+                        }
+                        html += `<small class='filter-badge'>${label} <b style="cursor: pointer" onclick="setFilterCondition('${mode}', '${key}', -1)">X</b></small> `;
                     }
-                }
-                document.getElementById('filter-conditions-include').innerHTML = htmlInclude;
+                    return html;
+                };
+                document.getElementById('filter-conditions-include').innerHTML = renderBadges('include');
+                document.getElementById('filter-conditions-exclude').innerHTML = renderBadges('exclude');
             };
 
             let addActiveSinceFilterCondition = () => {
@@ -347,58 +388,85 @@
                     console.error('Unknown filter condition mode: ' + mode);
                     return;
                 }
-                console.log(value)
                 if(value === "-1" || value === "false" || value === false || value === null || value === undefined || value === -1){
                     delete filterState[mode][key];
-                    renderFilterConditions();
-                    return;
                 }
                 else{
                     filterState[mode][key] = value;
-                    renderFilterConditions();
                 }
+                renderFilterConditions();
+                loadMembers();
             };
 
             let openFilterDialog = (mode) => {
                 document.querySelectorAll('dialog').forEach(d => d.remove());
-                let dialog;
-                if (mode === 'include'){
+                let dialogHtml;
+                const state = filterState[mode] || {};
+                const daysOptions = `
+                    <option value="-1">-</option>
+                    <option value="5">5 days</option>
+                    <option value="20">20 days</option>
+                    <option value="30">30 days</option>
+                    <option value="90">3 months</option>
+                    <option value="180">6 months</option>
+                    <option value="365">1 year</option>
+                `;
+                if (mode === 'include' || mode === 'exclude'){
                     dialogHtml = `
                         <dialog>
-                            <label>Active in last:</label>
-                            <select onchange="setFilterCondition('include','active_since', this.value)">
-                                <option value="-1"> Forever </option>
-                                <option value="5"> 5 days </option>
-                                <option value="20"> 20 days </option>
-                                <option value="90"> 3 month </option>
-                            </select>
+                            <h4>${mode === 'include' ? 'Include' : 'Exclude'} Members</h4>
+                            <table>
+                                <tr>
+                                    <td><label>Role:</label></td>
+                                    <td><select onchange="setFilterCondition('${mode}','member_role', this.value)">
+                                        <option value="-1">Any</option>
+                                        <option value="admin" ${state.member_role==='admin'?'selected':''}>Admin</option>
+                                        <option value="moderator" ${state.member_role==='moderator'?'selected':''}>Moderator</option>
+                                        <option value="member" ${state.member_role==='member'?'selected':''}>Member</option>
+                                    </select></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Active in last:</label></td>
+                                    <td><select onchange="setFilterCondition('${mode}','active_since', this.value)">
+                                        ${daysOptions.replace(`value="${state.active_since||'-1'}"`, `value="${state.active_since||'-1'}" selected`)}
+                                    </select></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Inactive since:</label></td>
+                                    <td><select onchange="setFilterCondition('${mode}','inactive_since', this.value)">
+                                        ${daysOptions.replace(`value="${state.inactive_since||'-1'}"`, `value="${state.inactive_since||'-1'}" selected`)}
+                                    </select></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Joined since:</label></td>
+                                    <td><select onchange="setFilterCondition('${mode}','joined_since', this.value)">
+                                        ${daysOptions.replace(`value="${state.joined_since||'-1'}"`, `value="${state.joined_since||'-1'}" selected`)}
+                                    </select></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Joined before:</label></td>
+                                    <td><select onchange="setFilterCondition('${mode}','joined_before', this.value)">
+                                        ${daysOptions.replace(`value="${state.joined_before||'-1'}"`, `value="${state.joined_before||'-1'}" selected`)}
+                                    </select></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Min Points:</label></td>
+                                    <td><input type="number" min="0" value="${state.points_min||''}" placeholder="0"
+                                        onchange="setFilterCondition('${mode}','points_min', this.value || -1)"></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Max Points:</label></td>
+                                    <td><input type="number" min="0" value="${state.points_max||''}" placeholder="∞"
+                                        onchange="setFilterCondition('${mode}','points_max', this.value || -1)"></td>
+                                </tr>
+                                <tr>
+                                    <td><label>Currently Online:</label></td>
+                                    <td><input type="checkbox" ${state.is_online?'checked':''}
+                                        onchange="setFilterCondition('${mode}','is_online', this.checked)"></td>
+                                </tr>
+                            </table>
                             <br>
-                            <label>Inactive since...</label>
-                            <select>
-                                <option></option>
-                            </select>
-                            <br>
-                            <label>Min other Communities...</label>
-                            <select>
-                                <option>Min other Communities</option>
-                            </select>
-                            <br>
-                            <label>Min percentile interactions...</label>
-                            <select>
-                                <option>Min percentile interactions</option>
-                            </select>
-                            <br>
-                            <label> Admins & Mods </label>
-                            <input type="checkbox" ${filterState.include.modadmin?'checked':''}
-                                    onchange="setFilterCondition('include','modadmin', this.checked)">
-                            <br><br>
-                        </dialog>
-                    `;
-                }
-                else if (mode === 'exclude'){
-                    dialogHtml = `
-                        <dialog>
-                            <h4>Exclude all Members</h4>
+                            <button onclick="this.closest('dialog').close()">Close</button>
                         </dialog>
                     `;
                 }
@@ -406,7 +474,6 @@
                 document.body.insertAdjacentHTML('beforeend', dialogHtml);
                 setTimeout(() => {
                     const dialog = document.querySelector('dialog');
-                    //lib.addEventHandlerToCloseDialogByClickingOutside(dialog);
                     dialog.showModal();
                 }, 100);
             }
@@ -468,9 +535,18 @@
 
         <article id="filter" style="display:none">
             <div style="margin-bottom: 5px">
-                <input placeholder="Search for members...">
-                <select>
-                    <option>Sort by...</option>
+                <input id="search-input" placeholder="Search for members..." onchange="filterState.searchTerm = this.value; loadMembers()">
+                <select id="sort-select" onchange="setSort(this.value)">
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                    <option value="points_desc">Points (high)</option>
+                    <option value="points_asc">Points (low)</option>
+                    <option value="level_desc">Level (high)</option>
+                    <option value="level_asc">Level (low)</option>
+                    <option value="last_active_desc">Last active (recent)</option>
+                    <option value="last_active_asc">Last active (oldest)</option>
+                    <option value="joined_desc">Joined (newest)</option>
+                    <option value="joined_asc">Joined (oldest)</option>
                 </select>
             </div>
             <div style="margin-bottom: 5px">

@@ -1,5 +1,6 @@
 from model import Model
 from src.config_entry import ConfigEntry
+from src.members_filter import MembersFilter
 
 
 class User(Model):
@@ -56,19 +57,36 @@ class User(Model):
             WHERE rn = 1;
 
         """
-        sql = f"""
-            SELECT *
-                FROM (
-                    SELECT
-                        us.*,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY community_slug, skool_id
-                            ORDER BY created_at DESC
-                        ) AS rn
-                    FROM {cls.__name__.lower()} us
-                    WHERE community_slug = ?
-                )
-            WHERE rn = 1;
-        """
         communitySlug = ConfigEntry.getByKey('current_community')
-        return cls.get_list(sql,[communitySlug.value])
+        return cls.filtered(MembersFilter({'communitySlug': communitySlug.value}))
+
+    @classmethod
+    def filtered(cls, f: MembersFilter) -> list['User']:
+        """
+        Returns deduplicated users (latest snapshot per skool_id) with filters applied.
+        """
+        filter_sql, filter_args = f.to_sql()
+
+        # Extract WHERE and ORDER BY from filter SQL
+        # filter_sql = "SELECT * FROM user WHERE 1=1 AND ... ORDER BY ..."
+        where_start = filter_sql.find('WHERE')
+        order_start = filter_sql.find('ORDER BY')
+
+        where_clause = filter_sql[where_start + 6:order_start].strip() if order_start > 0 else filter_sql[where_start + 6:].strip()
+        order_clause = filter_sql[order_start + 9:].strip() if order_start > 0 else 'name ASC'
+
+        sql = f"""
+            SELECT * FROM (
+                SELECT
+                    us.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY community_slug, skool_id
+                        ORDER BY created_at DESC
+                    ) AS rn
+                FROM {cls.__name__.lower()} us
+                WHERE {where_clause}
+            )
+            WHERE rn = 1
+            ORDER BY {order_clause}
+        """
+        return cls.get_list(sql, filter_args)

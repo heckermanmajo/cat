@@ -1,3 +1,25 @@
+
+Heute das alles vorbereiten, um den Kraftakt einfacher zu machen:
+- fetchen
+- filtern
+    - simple Aspekte
+- graph
+- activities
+- daten anzeigen + download
+- coming soon + stichpunkte was da soon kommt
+
+
+NICHT
+- ai
+- lizenzen
+- additional tags
+
+Montag
+Samstag
+
+
+
+
 - notes
 POSTS
 NOTES
