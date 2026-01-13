@@ -68,6 +68,9 @@ async function executeTask(tabId, task) {
             } else if (task.type === "likes") {
                 // Likes API endpoint
                 url = "https://www.skool.com/api/post/" + task.postSkoolHexId + "/votes?tab=upvotes";
+            } else if (task.type === "leaderboard") {
+                // Leaderboard page
+                url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + ".json?tab=leaderboard&p=" + task.pageParam + "&group=" + task.communitySlug;
             } else {
                 return { error: "Unknown task type: " + task.type };
             }

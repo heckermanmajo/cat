@@ -8,6 +8,7 @@ from src.fetch import Fetch
 from src.user import User
 from src.post import Post
 from src.profile import Profile
+from src.leaderboard import Leaderboard
 from src import extractor
 from src.members_filter import MembersFilter
 
@@ -21,6 +22,7 @@ Fetch.register(app)
 User.register(app)
 Post.register(app)
 Profile.register(app)
+Leaderboard.register(app)
 
 @app.route('/api/fetch-tasks')
 def get_fetch_tasks(): return jsonify([t.to_dict() for t in FetchTask.generateFetchTasks()])
@@ -34,6 +36,13 @@ def _extract_pagination(data: dict, fetch_type: str) -> tuple[int, int]:
     elif fetch_type == 'posts':
         # Posts haben kein totalPages, wir berechnen es (20 items pro Seite)
         total_pages = (total + 19) // 20 if total > 0 else 0
+    elif fetch_type == 'leaderboard':
+        # Leaderboard: Daten in leaderboardsData oder renderData.leaderboard
+        lb = pp.get('leaderboardsData', {}) or pp.get('renderData', {}).get('leaderboard', {})
+        total = len(lb.get('users', []))
+        # Schätze total_pages basierend auf limit (typisch 20)
+        limit = lb.get('limit', 20) or 20
+        total_pages = (total + limit - 1) // limit if total > 0 else 1
     else:
         total_pages = 0
     return total, total_pages
@@ -43,7 +52,7 @@ def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
     results = request.json.get('results', [])
     saved = []
-    extracted = {'users': 0, 'posts': 0, 'profiles': 0}
+    extracted = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
@@ -69,6 +78,8 @@ def post_fetch_result():
         extracted['users'] += ex['users']
         extracted['posts'] += ex['posts']
         extracted['profiles'] += ex['profiles']
+        extracted['leaderboard'] += ex['leaderboard']
+        extracted['leaderboard_applied'] += ex['leaderboard_applied']
     return jsonify({'saved': len(saved), 'fetches': saved, 'extracted': extracted}), 201
 
 @app.route('/api/extract/<int:fetch_id>', methods=['POST'])
@@ -84,6 +95,15 @@ def extract_all():
     """Manuell: Extrahiert aus allen Fetches."""
     result = extractor.extract_all_fetches()
     return jsonify(result)
+
+@app.route('/api/apply-leaderboard', methods=['POST'])
+def apply_leaderboard():
+    """Wendet Leaderboard-Punkte auf User an."""
+    community = ConfigEntry.getByKey('current_community')
+    if not community or not community.value:
+        return jsonify({'error': 'No community selected'}), 400
+    updated = extractor.apply_leaderboard_to_users(community.value)
+    return jsonify({'updated': updated, 'community': community.value})
 
 @app.route('/api/user/filter', methods=['POST'])
 def filter_users():

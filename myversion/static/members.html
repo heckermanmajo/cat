@@ -131,17 +131,26 @@
 
             const formatDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString() : '-';
 
+            const formatAge = (ts) => {
+                if (!ts) return '-';
+                const now = Math.floor(Date.now() / 1000);
+                const diff = now - ts;
+                if (diff < 60) return 'gerade eben';
+                if (diff < 3600) return Math.floor(diff / 60) + ' Min';
+                if (diff < 86400) return Math.floor(diff / 3600) + ' Std';
+                return Math.floor(diff / 86400) + ' Tage';
+            };
+
             const renderMemberCard = (member, showJson = false) => {
-                const onlineStatus = member.is_online ? '<span style="color:green">Online</span>' : '<span style="color:gray">Offline</span>';
                 return `
                     <article onclick="loadAndRenderProfileDetails(${member.id})" style="cursor: pointer">
-                        <b>@${member.name}</b> - ${member.first_name} ${member.last_name} ${onlineStatus}<br>
+                        <b>@${member.name}</b> - ${member.first_name} ${member.last_name}<br>
                         <small>
                             Role: <b>${member.member_role || '-'}</b> |
-                            Points: <b>${member.points || 0}</b> |
-                            Level: <b>${member.level || 0}</b><br>
+                            Points: <b>${member.points || 0}</b><br>
                             Last Active: ${formatDate(member.last_active)} |
-                            Joined: ${formatDate(member.member_created_at)}
+                            Joined: ${formatDate(member.member_created_at)} |
+                            <i>Fetched: ${formatAge(member.fetched_at)}</i>
                         </small>
                         ${showJson ? `<pre>${JSON.stringify(member, null, 2)}</pre>` : ''}
                     </article>
@@ -359,15 +368,6 @@
                             case 'points_max':
                                 label = `Points <= ${val}`;
                                 break;
-                            case 'level_min':
-                                label = `Level >= ${val}`;
-                                break;
-                            case 'level_max':
-                                label = `Level <= ${val}`;
-                                break;
-                            case 'is_online':
-                                label = `Online`;
-                                break;
                             default:
                                 continue;
                         }
@@ -459,11 +459,6 @@
                                     <td><input type="number" min="0" value="${state.points_max||''}" placeholder="∞"
                                         onchange="setFilterCondition('${mode}','points_max', this.value || -1)"></td>
                                 </tr>
-                                <tr>
-                                    <td><label>Currently Online:</label></td>
-                                    <td><input type="checkbox" ${state.is_online?'checked':''}
-                                        onchange="setFilterCondition('${mode}','is_online', this.checked)"></td>
-                                </tr>
                             </table>
                             <br>
                             <button onclick="this.closest('dialog').close()">Close</button>
@@ -541,8 +536,6 @@
                     <option value="name_desc">Name Z-A</option>
                     <option value="points_desc">Points (high)</option>
                     <option value="points_asc">Points (low)</option>
-                    <option value="level_desc">Level (high)</option>
-                    <option value="level_asc">Level (low)</option>
                     <option value="last_active_desc">Last active (recent)</option>
                     <option value="last_active_asc">Last active (oldest)</option>
                     <option value="joined_desc">Joined (newest)</option>

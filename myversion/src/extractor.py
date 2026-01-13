@@ -1,37 +1,57 @@
 """
-Extrahiert User, Post und Profile Entitäten aus Fetches.
+Extrahiert User, Post, Profile und Leaderboard Entitäten aus Fetches.
 Bei Re-Extraktion werden alte Einträge des Fetches überschrieben.
 """
 import json
 import time
+from datetime import datetime
 from .fetch import Fetch
 from .user import User
 from .post import Post
 from .profile import Profile
+from .leaderboard import Leaderboard
 from model import Model
+
+
+def _iso_to_timestamp(iso_str: str) -> int:
+    """Konvertiert ISO-Datum zu Unix-Timestamp. Returns 0 bei Fehler."""
+    if not iso_str:
+        return 0
+    try:
+        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
+        return int(dt.timestamp())
+    except:
+        return 0
 
 def extract_from_fetch(fetch: Fetch) -> dict:
     """
     Extrahiert Entitäten aus einem Fetch.
     Löscht vorher alle alten Einträge dieses Fetches.
-    Returns: {'users': int, 'posts': int, 'profiles': int}
+    Returns: {'users': int, 'posts': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int}
     """
+    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
     if fetch.type == 'members':
-        return {'users': _extract_users(fetch), 'posts': 0, 'profiles': 0}
-    if fetch.type == 'posts':
-        return {'users': 0, 'posts': _extract_posts(fetch), 'profiles': 0}
-    if fetch.type == 'profile':
-        return {'users': 0, 'posts': 0, 'profiles': _extract_profile(fetch)}
-    return {'users': 0, 'posts': 0, 'profiles': 0}
+        result['users'] = _extract_users(fetch)
+    elif fetch.type == 'posts':
+        result['posts'] = _extract_posts(fetch)
+    elif fetch.type == 'profile':
+        result['profiles'] = _extract_profile(fetch)
+    elif fetch.type == 'leaderboard':
+        result['leaderboard'] = _extract_leaderboard(fetch)
+        # Auto-apply leaderboard to users
+        result['leaderboard_applied'] = apply_leaderboard_to_users(fetch.community_slug)
+    return result
 
 def extract_all_fetches() -> dict:
     """Extrahiert aus allen Fetches."""
-    totals = {'users': 0, 'posts': 0, 'profiles': 0}
+    totals = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
     for fetch in Fetch.all():
         result = extract_from_fetch(fetch)
         totals['users'] += result['users']
         totals['posts'] += result['posts']
         totals['profiles'] += result['profiles']
+        totals['leaderboard'] += result['leaderboard']
+        totals['leaderboard_applied'] += result['leaderboard_applied']
     return totals
 
 def _extract_users(fetch: Fetch) -> int:
@@ -64,13 +84,12 @@ def _extract_users(fetch: Fetch) -> int:
             'member_id': member.get('id', ''),
             'member_role': member.get('role', ''),
             'member_group_id': member.get('groupId', ''),
-            'member_created_at': member.get('createdAt', ''),
+            'member_created_at': _iso_to_timestamp(member.get('createdAt', '')),
             'member_metadata': json.dumps(member_meta),
             'picture_url': meta.get('picture', ''),
             'bio': meta.get('bio', ''),
-            'points': member_meta.get('points', 0) or 0,
-            'level': member_meta.get('level', 0) or 0,
-            'last_active': member.get('lastOffline', ''),
+            # points kommen aus Leaderboard, nicht aus members-Fetch
+            'last_active': meta.get('lastOffline', 0) or 0,
             'is_online': meta.get('online', 0) or 0,
         })
         user.save()
@@ -165,3 +184,64 @@ def _extract_profile(fetch: Fetch) -> int:
     })
     profile.save()
     return 1
+
+def _extract_leaderboard(fetch: Fetch) -> int:
+    """Extrahiert Leaderboard-Einträge aus einem leaderboard-Fetch."""
+    # Alte Einträge dieses Fetches löschen
+    Model.connect().execute("DELETE FROM leaderboard WHERE fetch_id = ?", [fetch.id])
+    Model.connect().commit()
+
+    data = json.loads(fetch.raw_data) if fetch.raw_data else {}
+    # Leaderboard-Daten aus leaderboardsData oder renderData.leaderboard
+    lb_data = data.get('pageProps', {}).get('leaderboardsData', {})
+    if not lb_data:
+        lb_data = data.get('pageProps', {}).get('renderData', {}).get('leaderboard', {})
+
+    users = lb_data.get('users', [])
+    now = int(time.time())
+    count = 0
+
+    for entry in users:
+        lb = Leaderboard({
+            'fetch_id': fetch.id,
+            'fetched_at': now,
+            'community_slug': fetch.community_slug,
+            'user_skool_id': entry.get('userId', ''),
+            'rank': entry.get('rank', 0) or 0,
+            'points': entry.get('points', 0) or 0,
+        })
+        lb.save()
+        count += 1
+
+    return count
+
+def apply_leaderboard_to_users(community_slug: str) -> int:
+    """
+    Wendet Leaderboard-Daten auf User an.
+    Aktualisiert points und leaderboard_applied_at für alle User mit Leaderboard-Eintrag.
+    Returns: Anzahl aktualisierter User.
+    """
+    now = int(time.time())
+
+    # Hole neueste Leaderboard-Einträge pro User (dedupliziert)
+    sql = """
+        UPDATE user
+        SET points = (
+            SELECT lb.points FROM leaderboard lb
+            WHERE lb.user_skool_id = user.skool_id
+            AND lb.community_slug = user.community_slug
+            ORDER BY lb.fetched_at DESC
+            LIMIT 1
+        ),
+        leaderboard_applied_at = ?
+        WHERE community_slug = ?
+        AND EXISTS (
+            SELECT 1 FROM leaderboard lb
+            WHERE lb.user_skool_id = user.skool_id
+            AND lb.community_slug = user.community_slug
+        )
+    """
+    conn = Model.connect()
+    cursor = conn.execute(sql, [now, community_slug])
+    conn.commit()
+    return cursor.rowcount

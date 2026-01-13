@@ -12,6 +12,7 @@ class FetchStaleInformation:
     """Stale-Zeiten in Stunden. Namen müssen mit fetch type übereinstimmen."""
     POSTS = 24
     MEMBERS = 24
+    LEADERBOARD = 24
     PROFILE = 7 * 24   # singular, wie der fetch type
     COMMENTS = 7 * 24
     LIKES = 7 * 24
@@ -96,8 +97,8 @@ class FetchTask(Model):
     @classmethod
     def generateFetchTasks(cls) -> List["FetchTask"]:
         """
-        Generate fetch tasks in 2 phases:
-        Phase 1: members + posts (all pages)
+        Generate fetch tasks in 3 phases:
+        Phase 1: members + posts + leaderboard (all pages)
         Phase 2: profiles, comments, likes (only after phase 1 complete)
         """
         currentCommunity = ConfigEntry.getByKey("current_community")
@@ -106,18 +107,21 @@ class FetchTask(Model):
 
         slug = currentCommunity.value.strip()
 
-        # Phase 1a: Erste Seite members + posts (parallel)
+        # Phase 1a: Erste Seite members + posts + leaderboard (parallel)
         initial_tasks = []
         if not cls._has_valid_fetch('members', slug, page=1):
             initial_tasks.append(cls({"type": "members", "communitySlug": slug, "pageParam": 1}))
         if not cls._has_valid_fetch('posts', slug, page=1):
             initial_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": 1}))
+        if not cls._has_valid_fetch('leaderboard', slug, page=1):
+            initial_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": 1}))
         if initial_tasks:
             return initial_tasks
 
         # Phase 1b: Restliche Seiten
         members_total = cls._get_total_pages('members', slug)
         posts_total = cls._get_total_pages('posts', slug)
+        leaderboard_total = cls._get_total_pages('leaderboard', slug)
 
         missing_tasks = []
         for page in range(2, members_total + 1):
@@ -127,6 +131,10 @@ class FetchTask(Model):
         for page in range(2, posts_total + 1):
             if not cls._has_valid_fetch('posts', slug, page=page):
                 missing_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": page}))
+
+        for page in range(2, leaderboard_total + 1):
+            if not cls._has_valid_fetch('leaderboard', slug, page=page):
+                missing_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": page}))
 
         if missing_tasks:
             return missing_tasks

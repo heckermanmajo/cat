@@ -26,19 +26,19 @@ class User(Model):
     member_id: str = ""
     member_role: str = ""
     member_group_id: str = ""
-    member_created_at: str = ""
+    member_created_at: int = 0  # Unix timestamp (converted from ISO)
     member_metadata: str = ""   # JSON string
 
     # Extrahierte Felder aus metadata
     picture_url: str = ""       # Profilbild-URL
     bio: str = ""               # Bio-Text
 
-    # Extrahierte Felder aus member_metadata
-    points: int = 0             # Gamification-Punkte
-    level: int = 0              # Level in der Community
+    # Leaderboard-Daten (aus separatem Leaderboard-Fetch)
+    points: int = 0                  # Gamification-Punkte aus Leaderboard
+    leaderboard_applied_at: int = 0  # Wann points zuletzt aktualisiert
 
     # Activity
-    last_active: str = ""       # ISO timestamp from member.lastOffline
+    last_active: int = 0        # Unix timestamp from metadata.lastOffline
     is_online: int = 0          # 1 = currently online
 
     @classmethod

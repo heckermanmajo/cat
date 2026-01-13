@@ -91,22 +91,6 @@ class MembersFilter:
                     conditions.append("points <= ?")
                 args.append(points)
 
-            elif key == 'level_min':
-                level = int(val)
-                if negate:
-                    conditions.append("level < ?")
-                else:
-                    conditions.append("level >= ?")
-                args.append(level)
-
-            elif key == 'level_max':
-                level = int(val)
-                if negate:
-                    conditions.append("level > ?")
-                else:
-                    conditions.append("level <= ?")
-                args.append(level)
-
             elif key == 'is_online':
                 if val is True or val == 'true':
                     if negate:
@@ -123,8 +107,6 @@ class MembersFilter:
             'name_desc': 'name DESC',
             'points_asc': 'points ASC',
             'points_desc': 'points DESC',
-            'level_asc': 'level ASC',
-            'level_desc': 'level DESC',
             'last_active_asc': 'last_active ASC',
             'last_active_desc': 'last_active DESC',
             'joined_asc': 'member_created_at ASC',
