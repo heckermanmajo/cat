@@ -208,19 +208,43 @@ class FetchTask(Model):
         return tasks
 
     @classmethod
+    def _get_ever_fetched_ids(cls, fetch_type: str, slug: str, id_column: str) -> set:
+        """Lädt alle IDs die jemals gefetched wurden (egal ob stale oder nicht)."""
+        rows = Fetch.get_list(
+            f"SELECT DISTINCT {id_column} FROM fetch WHERE type = ? AND community_slug = ? AND status = 'ok'",
+            [fetch_type, slug]
+        )
+        return {getattr(r, id_column) for r in rows}
+
+    @classmethod
     def _generate_likes_tasks(cls, slug: str) -> List["FetchTask"]:
-        """Likes tasks für toplevel Posts < 3 Monate mit upvotes > 0."""
+        """
+        Likes tasks für toplevel Posts mit upvotes > 0.
+        - Initial fetch (noch nie gefetched): Posts < 90 Tage
+        - Re-fetch (stale): nur Posts < 7 Tage (ältere Posts bekommen kaum neue Likes)
+        """
         tasks = []
         now = time.time()
-        cutoff = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)
+        cutoff_initial = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)  # 90 Tage
+        cutoff_refetch = now - (7 * 86400)  # 7 Tage
+
         valid_ids = cls._get_valid_fetch_ids('likes', slug, 'post_skool_id')
+        ever_fetched_ids = cls._get_ever_fetched_ids('likes', slug, 'post_skool_id')
 
         posts = Post.get_list(
             "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0",
             [slug]
         )
         for p in posts:
-            # Skip wenn Post zu alt
+            # Skip wenn bereits gültiger Fetch existiert
+            if p.skool_id in valid_ids:
+                continue
+
+            # Cutoff abhängig davon ob schon mal gefetched
+            was_fetched_before = p.skool_id in ever_fetched_ids
+            cutoff = cutoff_refetch if was_fetched_before else cutoff_initial
+
+            # Skip wenn Post zu alt für den jeweiligen Cutoff
             if p.skool_created_at:
                 try:
                     from datetime import datetime
@@ -230,11 +254,10 @@ class FetchTask(Model):
                 except:
                     pass
 
-            if p.skool_id not in valid_ids:
-                tasks.append(cls({
-                    "type": "likes",
-                    "communitySlug": slug,
-                    "postSkoolHexId": p.skool_id,
-                    "postName": p.name,
-                }))
+            tasks.append(cls({
+                "type": "likes",
+                "communitySlug": slug,
+                "postSkoolHexId": p.skool_id,
+                "postName": p.name,
+            }))
         return tasks
