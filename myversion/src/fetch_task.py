@@ -39,6 +39,7 @@ class FetchTask(Model):
     userName: str = ""  # for profile fetch URL
     postSkoolHexId: str = ""  # for comments/likes fetch
     postName: str = ""  # for comments/likes fetch URL
+    groupSkoolId: str = ""  # Skool UUID for api2.skool.com calls (comments/likes)
     comment: str = ""  # explains why this task was generated
 
     # =========================================================================
@@ -217,6 +218,7 @@ class FetchTask(Model):
                     "communitySlug": slug,
                     "postSkoolHexId": p.skool_id,
                     "postName": p.name,
+                    "groupSkoolId": p.group_id,  # Skool UUID for api2.skool.com
                     "comment": f"Comments for post '{p.name}' ({p.comments} comments, <90 days old)",
                 }))
         return tasks
@@ -317,6 +319,7 @@ class FetchTask(Model):
                 "communitySlug": slug,
                 "postSkoolHexId": p.skool_id,
                 "postName": p.name,
+                "groupSkoolId": p.group_id,  # Skool UUID for api2.skool.com
                 "comment": comment,
             }))
         return tasks
@@ -327,6 +330,8 @@ class FetchTask(Model):
         Generate tasks to fetch about pages for other communities
         that have at least min_shared_members users.
         """
+        import json
+        from .profile import Profile
         tasks = []
 
         # Get min_shared_members threshold from settings (default 10)
@@ -338,14 +343,32 @@ class FetchTask(Model):
             except:
                 pass
 
-        # Get communities above threshold that haven't been fetched recently
+        # Calculate shared_user_count on-demand from profiles
+        profiles = Profile.get_list("SELECT skool_id, groups_member_of FROM profile WHERE groups_member_of != ''", [])
+        slug_users = {}  # slug -> set of skool_ids
+        for p in profiles:
+            groups = json.loads(p.groups_member_of) if p.groups_member_of else []
+            if not groups:
+                continue
+            for g in groups:
+                slug = g.get('name', '')
+                if slug:
+                    if slug not in slug_users:
+                        slug_users[slug] = set()
+                    slug_users[slug].add(p.skool_id)
+
+        # Get communities that haven't been fetched recently
         threshold = cls._stale_threshold('community_about')
         communities = OtherCommunity.get_list(
-            "SELECT * FROM othercommunity WHERE shared_user_count >= ? AND about_fetched = 0",
-            [min_threshold]
+            "SELECT * FROM othercommunity WHERE about_fetched = 0",
+            []
         )
 
         for oc in communities:
+            shared_count = len(slug_users.get(oc.slug, set()))
+            if shared_count < min_threshold:
+                continue
+
             # Check if we have a recent fetch for this community's about page
             recent_fetch = Fetch.get_list(
                 "SELECT * FROM fetch WHERE type = 'community_about' AND community_slug = ? AND status = 'ok' AND created_at > ?",
@@ -355,7 +378,7 @@ class FetchTask(Model):
                 tasks.append(cls({
                     "type": "community_about",
                     "communitySlug": oc.slug,
-                    "comment": f"About page for '{oc.slug}' ({oc.shared_user_count} shared members)",
+                    "comment": f"About page for '{oc.slug}' ({shared_count} shared members)",
                 }))
 
         return tasks

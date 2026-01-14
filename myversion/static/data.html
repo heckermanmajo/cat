@@ -57,6 +57,19 @@
                 target.innerHTML = html;
             }
 
+            async function showOverview(){
+                const res = await fetch('/api/database/overview');
+                const data = await res.json();
+                const target = document.getElementById('data-content');
+                if(!data.length){ target.innerHTML = '<p>Keine Tabellen vorhanden</p>'; return; }
+                let total = data.reduce((sum, t) => sum + t.count, 0);
+                let html = `<h3>Database Overview</h3><p>Total: ${total} entries</p><table><tr><th>Table</th><th>Entries</th></tr>`;
+                for (const t of data) {
+                    html += `<tr><td>${t.name}</td><td>${t.count}</td></tr>`;
+                }
+                target.innerHTML = html + '</table>';
+            }
+
             async function showDataTab(tab){
                 const target = document.getElementById('data-content');
                 if(tab === 'users'){
@@ -78,7 +91,7 @@
                     target.innerHTML = html + '</table>';
                 }
                 if(tab === 'posts'){
-                    const res = await fetch('/api/post');
+                    const res = await fetch('/api/post/latest');
                     const data = await res.json();
                     if(!data.length){ target.innerHTML = '<p>Keine Posts vorhanden</p>'; return; }
                     let html = '<table><tr><th>ID</th><th>Skool ID</th><th>Title</th><th>Author</th><th>Type</th><th>Community</th><th>Fetched</th></tr>';
@@ -141,7 +154,7 @@
 
                 // Batches durchlaufen
                 let processed = 0;
-                let totals = {users: 0, posts: 0, profiles: 0, leaderboard: 0, other_communities: 0};
+                let totals = {users: 0, posts: 0, comments: 0, profiles: 0, leaderboard: 0, other_communities: 0};
 
                 while(processed < total){
                     const res = await fetch('/api/extract-batch', {
@@ -153,6 +166,7 @@
                     processed += res.processed;
                     totals.users += res.extracted.users;
                     totals.posts += res.extracted.posts;
+                    totals.comments += res.extracted.comments;
                     totals.profiles += res.extracted.profiles;
                     totals.leaderboard += res.extracted.leaderboard;
                     totals.other_communities += res.extracted.other_communities;
@@ -161,7 +175,7 @@
                     const percent = Math.round((processed / total) * 100);
                     dialog.querySelector('#ext-progress-bar').value = percent;
                     dialog.querySelector('#ext-progress-text').textContent = `${processed} / ${total} Fetches (${percent}%)`;
-                    dialog.querySelector('#ext-stats').innerHTML = `Users: ${totals.users} | Posts: ${totals.posts} | Profiles: ${totals.profiles}`;
+                    dialog.querySelector('#ext-stats').innerHTML = `Users: ${totals.users} | Posts: ${totals.posts} | Comments: ${totals.comments} | Profiles: ${totals.profiles}`;
                 }
 
                 // Fertig
@@ -171,6 +185,7 @@
                     <ul>
                         <li>${totals.users} Users</li>
                         <li>${totals.posts} Posts</li>
+                        <li>${totals.comments} Comments</li>
                         <li>${totals.profiles} Profiles</li>
                         <li>${totals.leaderboard} Leaderboard</li>
                         <li>${totals.other_communities} Other Communities</li>
@@ -227,6 +242,7 @@
             <div style="margin-bottom:10px">
                 <button onclick="extractAll()">Extract All</button>
                 |
+                <button onclick="showOverview()">Overview</button>
                 <button onclick="showDataTab('users')">Users</button>
                 <button onclick="showDataTab('posts')">Posts</button>
                 <button onclick="showDataTab('profiles')">Profiles</button>

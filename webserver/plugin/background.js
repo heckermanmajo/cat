@@ -66,11 +66,13 @@ async function executeTask(tabId, task) {
                 // Profile page: /@username?group=communitySlug
                 url = "https://www.skool.com/_next/data/" + buildId + "/@" + task.userName + ".json?group=" + task.communitySlug;
             } else if (task.type === "comments") {
-                // Post detail page contains comments
-                url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + "/" + task.postName + ".json?group=" + task.communitySlug + "&p=" + task.postName;
+                // Comments API (api2.skool.com) - limit 25 (API rejects higher values)
+                if (!task.groupSkoolId) return { error: "groupSkoolId missing for comments" };
+                url = "https://api2.skool.com/posts/" + task.postSkoolHexId + "/comments?group-id=" + task.groupSkoolId + "&limit=25&pinned=true";
             } else if (task.type === "likes") {
-                // Likes API endpoint
-                url = "https://www.skool.com/api/post/" + task.postSkoolHexId + "/votes?tab=upvotes";
+                // Likes API (api2.skool.com)
+                if (!task.groupSkoolId) return { error: "groupSkoolId missing for likes" };
+                url = "https://api2.skool.com/posts/" + task.postSkoolHexId + "/vote-users?group-id=" + task.groupSkoolId;
             } else if (task.type === "leaderboard") {
                 // Leaderboard page
                 url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + ".json?tab=leaderboard&p=" + task.pageParam + "&group=" + task.communitySlug;

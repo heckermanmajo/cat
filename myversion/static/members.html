@@ -2,6 +2,7 @@
 <html lang="en">
     <head>
         <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="entity.js"></script>
         <script src="/entities/config_entry.js"></script>
         <script src="/entities/user.js"></script>
@@ -330,7 +331,74 @@
                         secondaryView.innerText = "EXPORT";
                     } break;
                     case "activity": {
-                        secondaryView.innerText = "ACTIVITY";
+                        (async()=>{
+                            secondaryView.innerHTML = `<h3>Loading Activity...</h3>`;
+                            const skoolIds = members.map(m => m.skool_id);
+
+                            // Beide APIs parallel laden
+                            const [communityRes, membersRes] = await Promise.all([
+                                get('/api/activity/community?days=90'),
+                                post('/api/activity/members', { skool_ids: skoolIds })
+                            ]);
+
+                            // Heatmap render function
+                            const renderHeatmap = (matrix, weekdays) => {
+                                const maxVal = Math.max(...matrix.flat(), 1);
+                                const hourLabels = ['12AM','','','3AM','','','6AM','','','9AM','','','12PM','','','3PM','','','6PM','','','9PM','','',''];
+                                let html = '<div style="display:grid; grid-template-columns: 40px repeat(7, 1fr); gap:1px; font-size:10px">';
+                                html += '<div></div>';
+                                for (const day of weekdays) html += `<div style="text-align:center">${day}</div>`;
+                                for (let h = 0; h < 24; h++) {
+                                    html += `<div style="text-align:right; padding-right:3px">${hourLabels[h]}</div>`;
+                                    for (let d = 0; d < 7; d++) {
+                                        const val = matrix[d][h];
+                                        const intensity = val / maxVal;
+                                        const alpha = 0.1 + intensity * 0.9;
+                                        const bg = `rgba(147, 51, 234, ${alpha.toFixed(2)})`;
+                                        html += `<div style="background:${bg}; height:10px; border-radius:1px" title="${weekdays[d]} ${h}:00 - ${val}"></div>`;
+                                    }
+                                }
+                                html += '</div>';
+                                return html;
+                            };
+
+                            let html = `<h3>Activity (${members.length} members)</h3>`;
+
+                            // Heatmap oben
+                            if (membersRes.ok) {
+                                const md = membersRes.data;
+                                html += `<small>Wann sind Members aktiv? (Wochentag x Stunde)</small>`;
+                                html += renderHeatmap(md.activity_matrix, md.weekdays);
+                            }
+
+                            // Line Chart unten (3 Monate)
+                            if (communityRes.ok) {
+                                const cd = communityRes.data;
+                                html += `
+                                    <h4 style="margin-top:20px">Last 3 Months</h4>
+                                    <canvas id="activity-chart" style="max-height: 200px"></canvas>
+                                    <small>Total: ${cd.posts.reduce((a,b)=>a+b,0)} posts, ${cd.comments.reduce((a,b)=>a+b,0)} comments</small>
+                                `;
+                            }
+
+                            secondaryView.innerHTML = html;
+
+                            // Chart.js nach DOM-Update
+                            if (communityRes.ok) {
+                                const cd = communityRes.data;
+                                new Chart(document.getElementById('activity-chart').getContext('2d'), {
+                                    type: 'line',
+                                    data: {
+                                        labels: cd.days.map(d => d.slice(5)),
+                                        datasets: [
+                                            { label: 'Posts', data: cd.posts, borderColor: '#3498db', tension: 0.3, pointRadius: 0 },
+                                            { label: 'Comments', data: cd.comments, borderColor: '#e74c3c', tension: 0.3, pointRadius: 0 }
+                                        ]
+                                    },
+                                    options: { responsive: true, maintainAspectRatio: true }
+                                });
+                            }
+                        })();
                     } break;
                     default: // posible -> not a bug
                         secondaryView.innerText = "";
@@ -591,7 +659,7 @@
                 <small>Actions:</small>
                 <button onclick="setCurrentSecondaryView('posts')">Posts</button>
                 <button onclick="setCurrentSecondaryView('communities')">Communities</button>
-                <button onclick="setCurrentSecondaryView('activity')">Activities</button>
+                <button onclick="setCurrentSecondaryView('activity')">Activity</button>
                 <button onclick="setCurrentSecondaryView('export')">Export</button>
             </span>
             <nav style="float: right">

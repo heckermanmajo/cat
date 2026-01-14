@@ -54,7 +54,7 @@ def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
     results = request.json.get('results', [])
     saved = []
-    extracted = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    extracted = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
@@ -79,6 +79,7 @@ def post_fetch_result():
         ex = extractor.extract_from_fetch(f)
         extracted['users'] += ex['users']
         extracted['posts'] += ex['posts']
+        extracted['comments'] += ex['comments']
         extracted['profiles'] += ex['profiles']
         extracted['leaderboard'] += ex['leaderboard']
         extracted['leaderboard_applied'] += ex['leaderboard_applied']
@@ -110,26 +111,28 @@ def extract_batch():
     """Extrahiert eine Batch von Fetches (offset/limit). Sortiert nach Typ für korrekte Reihenfolge."""
     offset = request.json.get('offset', 0)
     limit = request.json.get('limit', 50)
-    # Reihenfolge: members(1) -> posts(2) -> profile(3) -> leaderboard(4) -> community_about(5)
+    # Reihenfolge: members(1) -> posts(2) -> comments(3) -> profile(4) -> leaderboard(5) -> community_about(6)
     fetches = Fetch.get_list(
         """SELECT * FROM fetch ORDER BY
            CASE type
                WHEN 'members' THEN 1
                WHEN 'posts' THEN 2
-               WHEN 'profile' THEN 3
-               WHEN 'leaderboard' THEN 4
-               WHEN 'community_about' THEN 5
-               ELSE 6
+               WHEN 'comments' THEN 3
+               WHEN 'profile' THEN 4
+               WHEN 'leaderboard' THEN 5
+               WHEN 'community_about' THEN 6
+               ELSE 7
            END, id
            LIMIT ? OFFSET ?""",
         [limit, offset]
     )
-    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     Model.begin_batch()
     for f in fetches:
         ex = extractor.extract_from_fetch(f)
         result['users'] += ex['users']
         result['posts'] += ex['posts']
+        result['comments'] += ex['comments']
         result['profiles'] += ex['profiles']
         result['leaderboard'] += ex['leaderboard']
         result['leaderboard_applied'] += ex['leaderboard_applied']
@@ -158,6 +161,16 @@ def filter_users():
     users = User.filtered(f)
     return jsonify([u.to_dict() for u in users])
 
+@app.route('/api/post/latest')
+def get_posts_latest():
+    """Get latest post per skool_id (deduplicated)."""
+    posts = Post.get_list(
+        """SELECT * FROM post WHERE id IN (
+            SELECT MAX(id) FROM post GROUP BY skool_id
+        ) ORDER BY id DESC"""
+    )
+    return jsonify([p.to_dict() for p in posts])
+
 @app.route('/api/user/<int:user_id>/posts')
 def get_user_posts(user_id):
     """Get all posts by a user (via their skool_id)."""
@@ -171,7 +184,7 @@ def get_user_posts(user_id):
 
 @app.route('/api/post/by-users', methods=['POST'])
 def get_posts_by_users():
-    """Get posts filtered by user skool_ids."""
+    """Get posts filtered by user skool_ids (deduplicated: latest per skool_id)."""
     skool_ids = request.json.get('skool_ids', [])
     if not skool_ids:
         return jsonify([])
@@ -182,11 +195,13 @@ def get_posts_by_users():
         batch = skool_ids[i:i + batch_size]
         placeholders = ','.join(['?'] * len(batch))
         posts.extend(Post.get_list(
-            f"SELECT * FROM post WHERE user_id IN ({placeholders}) ORDER BY created_at DESC",
+            f"""SELECT * FROM post WHERE user_id IN ({placeholders})
+                AND id IN (SELECT MAX(id) FROM post GROUP BY skool_id)
+                ORDER BY id DESC""",
             batch
         ))
-    # Sort all results by created_at desc
-    posts.sort(key=lambda p: p.created_at, reverse=True)
+    # Sort all results by id desc (latest first)
+    posts.sort(key=lambda p: p.id, reverse=True)
     return jsonify([p.to_dict() for p in posts])
 
 @app.route('/api/user/<int:user_id>/communities')
@@ -301,6 +316,101 @@ def get_communities_by_users():
     # Sort by selection_count desc, then shared_user_count desc
     result.sort(key=lambda x: (-x['selection_count'], -x['shared_user_count']))
     return jsonify(result)
+
+@app.route('/api/activity/community')
+def get_community_activity():
+    """Community-wide activity: posts and comments per day."""
+    community = request.args.get('community') or (ConfigEntry.getByKey('current_community') or {}).value or ''
+    days = int(request.args.get('days', 90))
+
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    day_labels = [(today - timedelta(days=i)).isoformat() for i in range(days-1, -1, -1)]
+
+    # Posts per day (is_toplevel=1)
+    posts_sql = """
+        SELECT DATE(skool_created_at) as day, COUNT(*) as cnt
+        FROM post WHERE community_slug = ? AND is_toplevel = 1
+        AND DATE(skool_created_at) >= DATE('now', ?)
+        GROUP BY DATE(skool_created_at)
+    """
+    posts_rows = Model.query(posts_sql, [community, f'-{days} days'])
+    posts_map = {r['day']: r['cnt'] for r in posts_rows}
+
+    # Comments per day (is_toplevel=0)
+    comments_sql = """
+        SELECT DATE(skool_created_at) as day, COUNT(*) as cnt
+        FROM post WHERE community_slug = ? AND is_toplevel = 0
+        AND DATE(skool_created_at) >= DATE('now', ?)
+        GROUP BY DATE(skool_created_at)
+    """
+    comments_rows = Model.query(comments_sql, [community, f'-{days} days'])
+    comments_map = {r['day']: r['cnt'] for r in comments_rows}
+
+    # New members per day
+    cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
+    members_sql = """
+        SELECT DATE(member_created_at, 'unixepoch') as day, COUNT(DISTINCT skool_id) as cnt
+        FROM user WHERE community_slug = ? AND member_created_at >= ?
+        GROUP BY DATE(member_created_at, 'unixepoch')
+    """
+    members_rows = Model.query(members_sql, [community, cutoff])
+    members_map = {r['day']: r['cnt'] for r in members_rows}
+
+    return jsonify({
+        'days': day_labels,
+        'posts': [posts_map.get(d, 0) for d in day_labels],
+        'comments': [comments_map.get(d, 0) for d in day_labels],
+        'new_members': [members_map.get(d, 0) for d in day_labels]
+    })
+
+@app.route('/api/database/overview')
+def database_overview():
+    """Returns all tables with their entry counts."""
+    tables = Model.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    result = []
+    for t in tables:
+        name = t['name']
+        count = Model.query(f"SELECT COUNT(*) as c FROM {name}")[0]['c']
+        result.append({'name': name, 'count': count})
+    result.sort(key=lambda x: -x['count'])
+    return jsonify(result)
+
+@app.route('/api/activity/members', methods=['POST'])
+def get_members_activity():
+    """Member activity: Wochentag x Stunde Heatmap - wann sind Members aktiv (Posts + Comments)."""
+    skool_ids = request.json.get('skool_ids', [])
+    weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+    empty_matrix = [[0]*24 for _ in range(7)]
+    if not skool_ids:
+        return jsonify({'weekdays': weekdays, 'activity_matrix': empty_matrix})
+
+    def batch_query(sql_template, ids, batch_size=400):
+        results = []
+        for i in range(0, len(ids), batch_size):
+            batch = ids[i:i + batch_size]
+            placeholders = ','.join(['?'] * len(batch))
+            sql = sql_template.replace('__IDS__', placeholders)
+            results.extend(Model.query(sql, batch))
+        return results
+
+    # Alle Posts + Comments: Wochentag x Stunde (aus skool_created_at)
+    activity_sql = """
+        SELECT CAST(strftime('%w', skool_created_at) AS INTEGER) as dow,
+               CAST(strftime('%H', skool_created_at) AS INTEGER) as hour,
+               COUNT(*) as cnt
+        FROM post WHERE user_id IN (__IDS__) AND skool_created_at != ''
+        GROUP BY dow, hour
+    """
+    rows = batch_query(activity_sql, skool_ids)
+    activity_matrix = [[0]*24 for _ in range(7)]
+    for r in rows:
+        if r['dow'] is not None and r['hour'] is not None:
+            weekday = (r['dow'] - 1) % 7  # %w: 0=Sunday -> 0=Monday
+            activity_matrix[weekday][r['hour']] += r['cnt']
+
+    return jsonify({'weekdays': weekdays, 'activity_matrix': activity_matrix})
 
 @app.route('/')
 def index(): return send_from_directory('static', 'index.html')

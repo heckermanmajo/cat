@@ -28,13 +28,15 @@ def extract_from_fetch(fetch: Fetch) -> dict:
     """
     Extrahiert Entitäten aus einem Fetch.
     Löscht vorher alle alten Einträge dieses Fetches.
-    Returns: {'users': int, 'posts': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int, 'other_communities': int}
+    Returns: {'users': int, 'posts': int, 'comments': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int, 'other_communities': int}
     """
-    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     if fetch.type == 'members':
         result['users'] = _extract_users(fetch)
     elif fetch.type == 'posts':
         result['posts'] = _extract_posts(fetch)
+    elif fetch.type == 'comments':
+        result['comments'] = _extract_comments(fetch)
     elif fetch.type == 'profile':
         result['profiles'] = _extract_profile(fetch)
         result['other_communities'] = _extract_other_communities(fetch)
@@ -48,11 +50,12 @@ def extract_from_fetch(fetch: Fetch) -> dict:
 
 def extract_all_fetches() -> dict:
     """Extrahiert aus allen Fetches."""
-    totals = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    totals = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     for fetch in Fetch.all():
         result = extract_from_fetch(fetch)
         totals['users'] += result['users']
         totals['posts'] += result['posts']
+        totals['comments'] += result['comments']
         totals['profiles'] += result['profiles']
         totals['leaderboard'] += result['leaderboard']
         totals['leaderboard_applied'] += result['leaderboard_applied']
@@ -142,6 +145,70 @@ def _extract_posts(fetch: Fetch) -> int:
         count += 1
 
     return count
+
+
+def _extract_comments(fetch: Fetch) -> int:
+    """
+    Extrahiert Comments aus einem comments-Fetch (api2.skool.com).
+    Comments werden in die post-Tabelle gespeichert mit is_toplevel=0.
+    Format: { post_tree: { children: [...] }, pinned_post_tree: {}, last: int }
+    """
+    # Alte Einträge dieses Fetches löschen
+    Model.connect().execute("DELETE FROM post WHERE fetch_id = ?", [fetch.id])
+
+    data = json.loads(fetch.raw_data) if fetch.raw_data else {}
+
+    # api2.skool.com Format: direkt post_tree (snake_case, kein pageProps wrapper)
+    post_tree = data.get('post_tree', {})
+    children = post_tree.get('children', [])
+    now = int(time.time())
+
+    def extract_comment_tree(nodes: list) -> int:
+        """Rekursiv alle Comments aus children extrahieren."""
+        count = 0
+        for node in nodes:
+            p = node.get('post', {})
+            if not p.get('id'):
+                continue
+
+            u = p.get('user', {})
+            meta = p.get('metadata', {})
+            skool_id = p.get('id', '')
+            # api2 uses snake_case
+            root_id = p.get('root_id', '') or ''
+
+            post = Post({
+                'fetch_id': fetch.id,
+                'fetched_at': now,
+                'community_slug': fetch.community_slug,
+                'skool_id': skool_id,
+                'name': p.get('name', ''),
+                'post_type': p.get('post_type', ''),
+                'group_id': p.get('group_id', ''),
+                'user_id': p.get('user_id', ''),
+                'label_id': p.get('label_id', ''),
+                'root_id': root_id,
+                'skool_created_at': p.get('created_at', ''),
+                'skool_updated_at': p.get('updated_at', ''),
+                'metadata': json.dumps(meta),
+                'is_toplevel': 0,  # Comments sind immer nicht-toplevel
+                'comments': meta.get('comments', 0) or 0,
+                'upvotes': meta.get('upvotes', 0) or 0,
+                'user_name': u.get('name', ''),
+                'user_metadata': json.dumps(u.get('metadata', {})),
+            })
+            post.save()
+            count += 1
+
+            # Rekursiv children verarbeiten
+            sub_children = node.get('children', [])
+            if sub_children:
+                count += extract_comment_tree(sub_children)
+
+        return count
+
+    return extract_comment_tree(children)
+
 
 def _extract_profile(fetch: Fetch) -> int:
     """Extrahiert Profile aus einem profile-Fetch."""
