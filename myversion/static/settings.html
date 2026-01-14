@@ -21,6 +21,7 @@
                 }
                 lib.setupThemeOnLoad().then();
                 loadMinSharedMembers().then();
+                loadLikesSettings().then();
                 communityListData = await lib.loadAllCommunities();
                 {
                     let index = 0;
@@ -61,6 +62,24 @@
                 const val = document.getElementById("minSharedMembersInput").value || "10";
                 ConfigEntry.set(minSharedMembersKey, val).then();
             };
+
+            // Likes fetch settings
+            let loadLikesSettings = async () => {
+                const staleDays = await ConfigEntry.get("likes_stale_days");
+                const initialMaxDays = await ConfigEntry.get("likes_initial_max_days");
+                const refetchMaxDays = await ConfigEntry.get("likes_refetch_max_days");
+                const fetchComments = await ConfigEntry.get("likes_fetch_comments");
+
+                document.getElementById("likesStaleDaysInput").value = staleDays || "2";
+                document.getElementById("likesInitialMaxDaysInput").value = initialMaxDays || "90";
+                document.getElementById("likesRefetchMaxDaysInput").value = refetchMaxDays || "7";
+                document.getElementById("likesFetchCommentsInput").checked = fetchComments === "true";
+            };
+            let updateLikesSetting = (key, inputId, isCheckbox = false) => {
+                const el = document.getElementById(inputId);
+                const val = isCheckbox ? (el.checked ? "true" : "false") : el.value;
+                ConfigEntry.set(key, val).then();
+            };
         </script>
         <title>Cat</title>
     </head>
@@ -80,6 +99,40 @@
                 <h4>Other Community Fetch Threshold</h4>
                 <label>Min shared members to fetch about page:</label>
                 <input id="minSharedMembersInput" type="number" min="1" value="10" onchange="updateMinSharedMembers()">
+            </article>
+
+            <article>
+                <h4>Likes Fetch Settings</h4>
+
+                <div style="margin-bottom: 10px;">
+                    <label>Stale after (days):</label>
+                    <input id="likesStaleDaysInput" type="number" min="1" value="2"
+                           onchange="updateLikesSetting('likes_stale_days', 'likesStaleDaysInput')">
+                    <small style="display: block; color: #888;">How often likes are re-fetched for recent posts (default: 2)</small>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label>Initial fetch max post age (days):</label>
+                    <input id="likesInitialMaxDaysInput" type="number" min="1" value="90"
+                           onchange="updateLikesSetting('likes_initial_max_days', 'likesInitialMaxDaysInput')">
+                    <small style="display: block; color: #888;">Max age for posts that were never fetched before (default: 90)</small>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label>Re-fetch max post age (days):</label>
+                    <input id="likesRefetchMaxDaysInput" type="number" min="1" value="7"
+                           onchange="updateLikesSetting('likes_refetch_max_days', 'likesRefetchMaxDaysInput')">
+                    <small style="display: block; color: #888;">Max age for posts that need re-fetching (older posts rarely get new likes) (default: 7)</small>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label>
+                        <input id="likesFetchCommentsInput" type="checkbox"
+                               onchange="updateLikesSetting('likes_fetch_comments', 'likesFetchCommentsInput', true)">
+                        Fetch likes for comments
+                    </label>
+                    <small style="display: block; color: #888;">Enable to also fetch likes on comments, not just top-level posts (default: off)</small>
+                </div>
             </article>
 
             <article id="config-entries-list">

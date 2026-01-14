@@ -6,6 +6,7 @@ from flask import request, jsonify
 
 T = TypeVar('T')
 _conn: sqlite3.Connection = None
+_batch_mode: bool = False
 
 class Model:
     """
@@ -40,6 +41,17 @@ class Model:
             _conn = sqlite3.connect(db_path, check_same_thread=False)
             _conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
         return _conn
+
+    @staticmethod
+    def begin_batch():
+        global _batch_mode
+        _batch_mode = True
+
+    @staticmethod
+    def end_batch():
+        global _batch_mode
+        _batch_mode = False
+        Model.connect().commit()
 
     @staticmethod
     def _props(cls: type) -> dict[str, str]:
@@ -86,7 +98,8 @@ class Model:
             data['updated_at'] = self.updated_at
             sets = ', '.join([f"{k} = ?" for k in data.keys()])
             conn.execute(f"UPDATE {table} SET {sets} WHERE id = ?", list(data.values()) + [self.id])
-        conn.commit()
+        if not _batch_mode:
+            conn.commit()
 
     def delete(self) -> None:
         table = self.__class__.__name__.lower()

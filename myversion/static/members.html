@@ -126,6 +126,7 @@
                     members = res.data;
                     document.getElementById("memberAmount").innerText = members.length.toString();
                     renderMembersView();
+                    renderSecondaryView();
                 }
             };
 
@@ -268,66 +269,71 @@
             const secondaryViewConfigKey = "members.secondary_view";
             let currentSecondaryView = "posts";
             let renderSecondaryView = () => {
+                const secondaryView = document.getElementById('secondary-view');
+                if (!secondaryView) return; // No secondary view in graph mode
                 switch(currentSecondaryView){
                     case "posts": {
                         (async()=>{
-                            document.getElementById('secondary-view').innerHTML = `<h3>Loading Posts...</h3>`;
-                            /** @type {Post[]} */
-                            let data = await Post.all();
+                            secondaryView.innerHTML = `<h3>Loading Posts...</h3>`;
+                            // Get skool_ids of currently filtered members
+                            const skoolIds = members.map(m => m.skool_id);
+                            const res = await post('/api/post/by-users', { skool_ids: skoolIds });
+                            const data = res.ok ? res.data : [];
                             let html = `<h3>Posts (${data.length})</h3>`;
-                            for (const post of data) {
-                                const meta = post.metadata ? JSON.parse(post.metadata) : {};
-                                const title = meta.title || post.name || '(Untitled)';
+                            for (const p of data) {
+                                const meta = p.metadata ? JSON.parse(p.metadata) : {};
+                                const title = meta.title || p.name || '(Untitled)';
                                 const content = meta.content || '';
                                 const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
-                                const createdAt = post.skool_created_at ? new Date(post.skool_created_at).toLocaleDateString() : '-';
+                                const createdAt = p.skool_created_at ? new Date(p.skool_created_at).toLocaleDateString() : '-';
                                 html += `
                                     <article style="margin: 4px 0; padding: 8px; border-left: 3px solid #3498db">
                                         <b>${title}</b><br>
                                         <small style="color: #666">${preview}</small><br>
                                         <small>
-                                            by <b>${post.user_name || '-'}</b> |
-                                            ${post.upvotes || 0} upvotes | ${post.comments || 0} comments |
-                                            ${post.community_slug} | ${createdAt}
+                                            by <b>${p.user_name || '-'}</b> |
+                                            ${p.upvotes || 0} upvotes | ${p.comments || 0} comments |
+                                            ${p.community_slug} | ${createdAt}
                                         </small>
                                     </article>
                                 `;
                             }
-                            document.getElementById('secondary-view').innerHTML = html;
+                            secondaryView.innerHTML = html;
                         })();
                     } break;
                     case "communities": {
                         (async()=>{
-                            const view = document.getElementById('secondary-view');
-                            view.innerHTML = `<h3>Loading Communities...</h3>`;
-                            const res = await get('/api/other-communities');
+                            secondaryView.innerHTML = `<h3>Loading Communities...</h3>`;
+                            // Get skool_ids of currently filtered members
+                            const skoolIds = members.map(m => m.skool_id);
+                            const res = await post('/api/communities/by-users', { skool_ids: skoolIds });
                             if (!res.ok) {
-                                view.innerHTML = `<h3>Error loading communities</h3>`;
+                                secondaryView.innerHTML = `<h3>Error loading communities</h3>`;
                                 return;
                             }
                             let html = `<h3>Other Communities (${res.data.length})</h3>`;
-                            html += `<small>Discovered from profile fetches</small><br><br>`;
+                            html += `<small>Other communities of ${members.length} selected members</small><br><br>`;
                             for (const c of res.data) {
                                 const name = c.name || c.slug;
                                 const fetched = c.about_fetched ? '(details fetched)' : '';
                                 html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #27ae60; cursor: pointer"
                                     onclick="changeCurrentCommunity('${c.slug}')">
                                     <b>${name}</b> <small style="color: #888">${fetched}</small><br>
-                                    <small>${c.shared_user_count} shared members | slug: ${c.slug}</small>
+                                    <small><b>${c.selection_count}</b> of selection | ${c.shared_user_count} global | slug: ${c.slug}</small>
                                 </article>`;
                             }
-                            if (!res.data.length) html += `<small>No other communities found yet. Fetch some profiles first.</small>`;
-                            view.innerHTML = html;
+                            if (!res.data.length) html += `<small>No other communities found for selected members.</small>`;
+                            secondaryView.innerHTML = html;
                         })();
                     } break;
                     case "export": {
-                        document.getElementById('secondary-view').innerText = "EXPORT";
+                        secondaryView.innerText = "EXPORT";
                     } break;
                     case "activity": {
-                        document.getElementById('secondary-view').innerText = "ACTIVITY";
+                        secondaryView.innerText = "ACTIVITY";
                     } break;
                     default: // posible -> not a bug
-                        document.getElementById('secondary-view').innerText = "";
+                        secondaryView.innerText = "";
                         break;
                 }
             };

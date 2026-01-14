@@ -99,6 +99,44 @@ def extract_all():
     result = extractor.extract_all_fetches()
     return jsonify(result)
 
+@app.route('/api/extract-info')
+def extract_info():
+    """Gibt Anzahl der Fetches zurück für Batch-Verarbeitung."""
+    count = Fetch.count()
+    return jsonify({'total': count})
+
+@app.route('/api/extract-batch', methods=['POST'])
+def extract_batch():
+    """Extrahiert eine Batch von Fetches (offset/limit). Sortiert nach Typ für korrekte Reihenfolge."""
+    offset = request.json.get('offset', 0)
+    limit = request.json.get('limit', 50)
+    # Reihenfolge: members(1) -> posts(2) -> profile(3) -> leaderboard(4) -> community_about(5)
+    fetches = Fetch.get_list(
+        """SELECT * FROM fetch ORDER BY
+           CASE type
+               WHEN 'members' THEN 1
+               WHEN 'posts' THEN 2
+               WHEN 'profile' THEN 3
+               WHEN 'leaderboard' THEN 4
+               WHEN 'community_about' THEN 5
+               ELSE 6
+           END, id
+           LIMIT ? OFFSET ?""",
+        [limit, offset]
+    )
+    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    Model.begin_batch()
+    for f in fetches:
+        ex = extractor.extract_from_fetch(f)
+        result['users'] += ex['users']
+        result['posts'] += ex['posts']
+        result['profiles'] += ex['profiles']
+        result['leaderboard'] += ex['leaderboard']
+        result['leaderboard_applied'] += ex['leaderboard_applied']
+        result['other_communities'] += ex['other_communities']
+    Model.end_batch()
+    return jsonify({'extracted': result, 'processed': len(fetches)})
+
 @app.route('/api/apply-leaderboard', methods=['POST'])
 def apply_leaderboard():
     """Wendet Leaderboard-Punkte auf User an."""
@@ -131,6 +169,26 @@ def get_user_posts(user_id):
     )
     return jsonify([p.to_dict() for p in posts])
 
+@app.route('/api/post/by-users', methods=['POST'])
+def get_posts_by_users():
+    """Get posts filtered by user skool_ids."""
+    skool_ids = request.json.get('skool_ids', [])
+    if not skool_ids:
+        return jsonify([])
+    # Batch to avoid SQLite variable limit
+    posts = []
+    batch_size = 400
+    for i in range(0, len(skool_ids), batch_size):
+        batch = skool_ids[i:i + batch_size]
+        placeholders = ','.join(['?'] * len(batch))
+        posts.extend(Post.get_list(
+            f"SELECT * FROM post WHERE user_id IN ({placeholders}) ORDER BY created_at DESC",
+            batch
+        ))
+    # Sort all results by created_at desc
+    posts.sort(key=lambda p: p.created_at, reverse=True)
+    return jsonify([p.to_dict() for p in posts])
+
 @app.route('/api/user/<int:user_id>/communities')
 def get_user_communities(user_id):
     """Get all communities where a user (by skool_id) is a member."""
@@ -161,11 +219,88 @@ def get_shared_communities():
 
 @app.route('/api/other-communities')
 def get_other_communities():
-    """Get all discovered communities from profile fetches, sorted by shared_user_count."""
-    communities = OtherCommunity.get_list(
-        "SELECT * FROM othercommunity ORDER BY shared_user_count DESC", []
-    )
-    return jsonify([c.to_dict() for c in communities])
+    """Get all discovered communities from profile fetches, with calculated shared_user_count."""
+    # Calculate counts from profiles (DISTINCT skool_ids per community)
+    profiles = Model.query("SELECT skool_id, groups_member_of FROM profile WHERE groups_member_of != ''")
+    slug_users = {}  # slug -> set of skool_ids
+    for p in profiles:
+        groups = json.loads(p['groups_member_of']) if p['groups_member_of'] else []
+        if not groups:
+            continue
+        for g in groups:
+            slug = g.get('name', '')
+            if slug:
+                if slug not in slug_users:
+                    slug_users[slug] = set()
+                slug_users[slug].add(p['skool_id'])
+
+    # Get all OtherCommunities and add calculated count
+    communities = OtherCommunity.get_list("SELECT * FROM othercommunity", [])
+    result = []
+    for c in communities:
+        data = c.to_dict()
+        data['shared_user_count'] = len(slug_users.get(c.slug, set()))
+        result.append(data)
+
+    # Sort by shared_user_count desc
+    result.sort(key=lambda x: -x['shared_user_count'])
+    return jsonify(result)
+
+@app.route('/api/communities/by-users', methods=['POST'])
+def get_communities_by_users():
+    """Get OtherCommunities where selected users are members, with selection and global count."""
+    skool_ids = request.json.get('skool_ids', [])
+    if not skool_ids:
+        return jsonify([])
+
+    # Calculate global shared_user_count from ALL profiles
+    all_profiles = Model.query("SELECT skool_id, groups_member_of FROM profile WHERE groups_member_of != ''")
+    global_slug_users = {}  # slug -> set of skool_ids
+    for p in all_profiles:
+        groups = json.loads(p['groups_member_of']) if p['groups_member_of'] else []
+        if not groups:
+            continue
+        for g in groups:
+            slug = g.get('name', '')
+            if slug:
+                if slug not in global_slug_users:
+                    global_slug_users[slug] = set()
+                global_slug_users[slug].add(p['skool_id'])
+
+    # Count how many SELECTED users are in each community
+    skool_ids_set = set(skool_ids)
+    selection_counts = {}  # slug -> count of selected users
+    for slug, users in global_slug_users.items():
+        count = len(users & skool_ids_set)
+        if count > 0:
+            selection_counts[slug] = count
+
+    if not selection_counts:
+        return jsonify([])
+
+    # Get OtherCommunity data in batches
+    communities = []
+    slugs = list(selection_counts.keys())
+    batch_size = 400
+    for i in range(0, len(slugs), batch_size):
+        batch = slugs[i:i + batch_size]
+        placeholders = ','.join(['?'] * len(batch))
+        communities.extend(OtherCommunity.get_list(
+            f"SELECT * FROM othercommunity WHERE slug IN ({placeholders})",
+            batch
+        ))
+
+    # Build result with calculated counts
+    result = []
+    for c in communities:
+        data = c.to_dict()
+        data['selection_count'] = selection_counts.get(c.slug, 0)
+        data['shared_user_count'] = len(global_slug_users.get(c.slug, set()))
+        result.append(data)
+
+    # Sort by selection_count desc, then shared_user_count desc
+    result.sort(key=lambda x: (-x['selection_count'], -x['shared_user_count']))
+    return jsonify(result)
 
 @app.route('/')
 def index(): return send_from_directory('static', 'index.html')

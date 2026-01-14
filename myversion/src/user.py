@@ -43,22 +43,9 @@ class User(Model):
 
     @classmethod
     def all(cls, order: str = 'id DESC') -> list['User']:
-        """
-        SELECT *
-            FROM (
-                SELECT
-                    us.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY platform_user_id
-                        ORDER BY created_at DESC
-                    ) AS rn
-                FROM user_snapshots us
-            )
-            WHERE rn = 1;
-
-        """
-        communitySlug = ConfigEntry.getByKey('current_community')
-        return cls.filtered(MembersFilter({'communitySlug': communitySlug.value}))
+        community = ConfigEntry.getByKey('current_community')
+        slug = community.value if community else ''
+        return cls.filtered(MembersFilter({'communitySlug': slug}))
 
     @classmethod
     def filtered(cls, f: MembersFilter) -> list['User']:

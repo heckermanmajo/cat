@@ -63,7 +63,6 @@ def _extract_users(fetch: Fetch) -> int:
     """Extrahiert Users aus einem members-Fetch."""
     # Alte Einträge dieses Fetches löschen
     Model.connect().execute("DELETE FROM user WHERE fetch_id = ?", [fetch.id])
-    Model.connect().commit()
 
     data = json.loads(fetch.raw_data) if fetch.raw_data else {}
     users_raw = data.get('pageProps', {}).get('users', [])
@@ -106,7 +105,6 @@ def _extract_posts(fetch: Fetch) -> int:
     """Extrahiert Posts aus einem posts-Fetch."""
     # Alte Einträge dieses Fetches löschen
     Model.connect().execute("DELETE FROM post WHERE fetch_id = ?", [fetch.id])
-    Model.connect().commit()
 
     data = json.loads(fetch.raw_data) if fetch.raw_data else {}
     trees = data.get('pageProps', {}).get('postTrees', [])
@@ -149,7 +147,6 @@ def _extract_profile(fetch: Fetch) -> int:
     """Extrahiert Profile aus einem profile-Fetch."""
     # Alte Einträge dieses Fetches löschen
     Model.connect().execute("DELETE FROM profile WHERE fetch_id = ?", [fetch.id])
-    Model.connect().commit()
 
     data = json.loads(fetch.raw_data) if fetch.raw_data else {}
     # Profile-Daten kommen aus currentUser oder renderData.user
@@ -194,7 +191,6 @@ def _extract_leaderboard(fetch: Fetch) -> int:
     """Extrahiert Leaderboard-Einträge aus einem leaderboard-Fetch."""
     # Alte Einträge dieses Fetches löschen
     Model.connect().execute("DELETE FROM leaderboard WHERE fetch_id = ?", [fetch.id])
-    Model.connect().commit()
 
     data = json.loads(fetch.raw_data) if fetch.raw_data else {}
     # Leaderboard-Daten aus leaderboardsData oder renderData.leaderboard
@@ -248,7 +244,6 @@ def apply_leaderboard_to_users(community_slug: str) -> int:
     """
     conn = Model.connect()
     cursor = conn.execute(sql, [now, community_slug])
-    conn.commit()
     return cursor.rowcount
 
 
@@ -256,7 +251,7 @@ def _extract_other_communities(fetch: Fetch) -> int:
     """
     Extracts other communities from a profile fetch.
     Looks in groupsMemberOf for community slugs different from the fetch community.
-    Updates shared_user_count for each discovered community.
+    Only creates new OtherCommunity entries (shared_user_count is calculated on-demand).
     """
     data = json.loads(fetch.raw_data) if fetch.raw_data else {}
     u = data.get('pageProps', {}).get('currentUser', {})
@@ -285,51 +280,16 @@ def _extract_other_communities(fetch: Fetch) -> int:
             "SELECT * FROM othercommunity WHERE slug = ?", [slug]
         )
 
-        if existing:
-            # Update shared_user_count
-            oc = existing[0]
-            oc.shared_user_count += 1
-            oc.save()
-        else:
+        if not existing:
             # Create new entry
             oc = OtherCommunity({
                 'slug': slug,
                 'name': display_name,
-                'shared_user_count': 1,
             })
             oc.save()
             count += 1
 
     return count
-
-
-def recalculate_other_community_counts() -> int:
-    """
-    Recalculates shared_user_count for all OtherCommunities
-    based on actual profile data in groupsMemberOf.
-    """
-    # Reset all counts
-    Model.connect().execute("UPDATE othercommunity SET shared_user_count = 0")
-    Model.connect().commit()
-
-    # Get all profiles
-    profiles = Profile.get_list("SELECT * FROM profile", [])
-
-    for profile in profiles:
-        groups = json.loads(profile.groups_member_of) if profile.groups_member_of else []
-        for group in groups:
-            # 'name' field is the slug
-            slug = group.get('name', '')
-            if not slug or slug == profile.community_slug:
-                continue
-
-            Model.connect().execute(
-                "UPDATE othercommunity SET shared_user_count = shared_user_count + 1 WHERE slug = ?",
-                [slug]
-            )
-
-    Model.connect().commit()
-    return OtherCommunity.count()
 
 
 def _extract_community_about(fetch: Fetch) -> None:

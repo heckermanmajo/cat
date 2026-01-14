@@ -22,15 +22,18 @@
                 const tasks = await res.json();
                 const target = document.getElementById('fetchqueue-target');
                 if(!tasks.length){ target.innerHTML = '<p>Keine Tasks</p>'; return; }
-                let html = `<b>${tasks.length} Tasks</b><br><table><tr><th>Type</th><th>Community</th><th>Page</th><th>User Skool ID</th><th>User Name</th><th>Post Skool ID</th><th>Post Name</th></tr>`;
+                // Count tasks by type
+                const typeCounts = {};
+                for (const t of tasks) { typeCounts[t.type] = (typeCounts[t.type] || 0) + 1; }
+                const summary = Object.entries(typeCounts).map(([type, count]) => `(${count}) ${type}`).join(' ');
+                let html = `<b>${tasks.length} Tasks:</b> ${summary}<br><table><tr><th>Type</th><th>Community</th><th>Comment</th><th>Page</th><th>User</th><th>Post</th></tr>`;
                 for (const t of tasks) {
                     html += `<tr>
                         <td>${t.type}</td>
                         <td>${t.communitySlug}</td>
+                        <td><small>${t.comment || '-'}</small></td>
                         <td>${t.pageParam || '-'}</td>
-                        <td><small>${t.userSkoolHexId || '-'}</small></td>
                         <td>${t.userName || '-'}</td>
-                        <td><small>${t.postSkoolHexId || '-'}</small></td>
                         <td>${t.postName || '-'}</td>
                     </tr>`;
                 }
@@ -115,9 +118,65 @@
             }
 
             async function extractAll(){
-                const res = await fetch('/api/extract-all', {method: 'POST'});
-                const data = await res.json();
-                alert(`Extrahiert: ${data.users} Users, ${data.posts} Posts, ${data.profiles} Profiles`);
+                // Dialog erstellen
+                const dialog = document.createElement('dialog');
+                dialog.innerHTML = `
+                    <h3>Extraktion läuft...</h3>
+                    <p style="color:orange"><b>Fenster nicht schließen!</b></p>
+                    <div id="ext-progress-text">Starte...</div>
+                    <progress id="ext-progress-bar" value="0" max="100" style="width:300px"></progress>
+                    <div id="ext-stats" style="margin-top:10px;font-size:12px"></div>
+                `;
+                document.body.appendChild(dialog);
+                dialog.showModal();
+
+                // Info holen
+                const info = await fetch('/api/extract-info').then(r => r.json());
+                const total = info.total;
+                if(total === 0){
+                    dialog.innerHTML = `<h3>Keine Fetches vorhanden</h3><button onclick="this.closest('dialog').close()">OK</button>`;
+                    return;
+                }
+                const batchSize = 50;
+
+                // Batches durchlaufen
+                let processed = 0;
+                let totals = {users: 0, posts: 0, profiles: 0, leaderboard: 0, other_communities: 0};
+
+                while(processed < total){
+                    const res = await fetch('/api/extract-batch', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({offset: processed, limit: batchSize})
+                    }).then(r => r.json());
+
+                    processed += res.processed;
+                    totals.users += res.extracted.users;
+                    totals.posts += res.extracted.posts;
+                    totals.profiles += res.extracted.profiles;
+                    totals.leaderboard += res.extracted.leaderboard;
+                    totals.other_communities += res.extracted.other_communities;
+
+                    // Progress updaten
+                    const percent = Math.round((processed / total) * 100);
+                    dialog.querySelector('#ext-progress-bar').value = percent;
+                    dialog.querySelector('#ext-progress-text').textContent = `${processed} / ${total} Fetches (${percent}%)`;
+                    dialog.querySelector('#ext-stats').innerHTML = `Users: ${totals.users} | Posts: ${totals.posts} | Profiles: ${totals.profiles}`;
+                }
+
+                // Fertig
+                dialog.innerHTML = `
+                    <h3>Fertig!</h3>
+                    <p>Extrahiert:</p>
+                    <ul>
+                        <li>${totals.users} Users</li>
+                        <li>${totals.posts} Posts</li>
+                        <li>${totals.profiles} Profiles</li>
+                        <li>${totals.leaderboard} Leaderboard</li>
+                        <li>${totals.other_communities} Other Communities</li>
+                    </ul>
+                    <button onclick="this.closest('dialog').close()">OK</button>
+                `;
             }
         </script>
         <title>Cat</title>

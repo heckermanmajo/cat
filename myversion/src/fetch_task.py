@@ -16,10 +16,10 @@ class FetchStaleInformation:
     LEADERBOARD = 24
     PROFILE = 7 * 24   # singular, wie der fetch type
     COMMENTS = 7 * 24
-    LIKES = 7 * 24
+    LIKES = 2 * 24     # default 2 days, configurable via settings
     COMMUNITY_ABOUT = 30 * 24  # About pages selten aktualisiert
 
-    # Harte Cutoffs: ignoriere ältere Daten komplett
+    # Harte Cutoffs: ignoriere ältere Daten komplett (defaults, likes are configurable)
     MAX_POST_AGE_DAYS = 90        # comments/likes nur für Posts < 3 Monate
     MAX_USER_INACTIVE_DAYS = 90   # profiles nur für User online < 3 Monate
 
@@ -39,6 +39,7 @@ class FetchTask(Model):
     userName: str = ""  # for profile fetch URL
     postSkoolHexId: str = ""  # for comments/likes fetch
     postName: str = ""  # for comments/likes fetch URL
+    comment: str = ""  # explains why this task was generated
 
     # =========================================================================
     # Hilfsfunktionen
@@ -112,11 +113,14 @@ class FetchTask(Model):
         # Phase 1a: Erste Seite members + posts + leaderboard (parallel)
         initial_tasks = []
         if not cls._has_valid_fetch('members', slug, page=1):
-            initial_tasks.append(cls({"type": "members", "communitySlug": slug, "pageParam": 1}))
+            initial_tasks.append(cls({"type": "members", "communitySlug": slug, "pageParam": 1,
+                "comment": "Initial members fetch (page 1) to get total page count"}))
         if not cls._has_valid_fetch('posts', slug, page=1):
-            initial_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": 1}))
+            initial_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": 1,
+                "comment": "Initial posts fetch (page 1) to get total page count"}))
         if not cls._has_valid_fetch('leaderboard', slug, page=1):
-            initial_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": 1}))
+            initial_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": 1,
+                "comment": "Initial leaderboard fetch (page 1) to get user points"}))
         if initial_tasks:
             return initial_tasks
 
@@ -128,15 +132,18 @@ class FetchTask(Model):
         missing_tasks = []
         for page in range(2, members_total + 1):
             if not cls._has_valid_fetch('members', slug, page=page):
-                missing_tasks.append(cls({"type": "members", "communitySlug": slug, "pageParam": page}))
+                missing_tasks.append(cls({"type": "members", "communitySlug": slug, "pageParam": page,
+                    "comment": f"Members page {page}/{members_total}"}))
 
         for page in range(2, posts_total + 1):
             if not cls._has_valid_fetch('posts', slug, page=page):
-                missing_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": page}))
+                missing_tasks.append(cls({"type": "posts", "communitySlug": slug, "pageParam": page,
+                    "comment": f"Posts page {page}/{posts_total}"}))
 
         for page in range(2, leaderboard_total + 1):
             if not cls._has_valid_fetch('leaderboard', slug, page=page):
-                missing_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": page}))
+                missing_tasks.append(cls({"type": "leaderboard", "communitySlug": slug, "pageParam": page,
+                    "comment": f"Leaderboard page {page}/{leaderboard_total}"}))
 
         if missing_tasks:
             return missing_tasks
@@ -177,6 +184,7 @@ class FetchTask(Model):
                     "communitySlug": slug,
                     "userSkoolHexId": u.skool_id,
                     "userName": u.name,
+                    "comment": f"Profile for user '{u.name}' (active in last 90 days)",
                 }))
         return tasks
 
@@ -209,6 +217,7 @@ class FetchTask(Model):
                     "communitySlug": slug,
                     "postSkoolHexId": p.skool_id,
                     "postName": p.name,
+                    "comment": f"Comments for post '{p.name}' ({p.comments} comments, <90 days old)",
                 }))
         return tasks
 
@@ -222,24 +231,62 @@ class FetchTask(Model):
         return {getattr(r, id_column) for r in rows}
 
     @classmethod
+    def _get_likes_settings(cls) -> dict:
+        """Read likes settings from ConfigEntry with defaults."""
+        settings = {
+            'stale_days': 2,
+            'initial_max_days': 90,
+            'refetch_max_days': 7,
+            'fetch_comments': False,
+        }
+        stale = ConfigEntry.getByKey('likes_stale_days')
+        if stale and stale.value:
+            try: settings['stale_days'] = int(stale.value)
+            except: pass
+        initial = ConfigEntry.getByKey('likes_initial_max_days')
+        if initial and initial.value:
+            try: settings['initial_max_days'] = int(initial.value)
+            except: pass
+        refetch = ConfigEntry.getByKey('likes_refetch_max_days')
+        if refetch and refetch.value:
+            try: settings['refetch_max_days'] = int(refetch.value)
+            except: pass
+        fetch_comments = ConfigEntry.getByKey('likes_fetch_comments')
+        if fetch_comments and fetch_comments.value == 'true':
+            settings['fetch_comments'] = True
+        return settings
+
+    @classmethod
     def _generate_likes_tasks(cls, slug: str) -> List["FetchTask"]:
         """
-        Likes tasks für toplevel Posts mit upvotes > 0.
-        - Initial fetch (noch nie gefetched): Posts < 90 Tage
-        - Re-fetch (stale): nur Posts < 7 Tage (ältere Posts bekommen kaum neue Likes)
+        Likes tasks für Posts mit upvotes > 0.
+        - Initial fetch (noch nie gefetched): Posts < initial_max_days (default 90)
+        - Re-fetch (stale): nur Posts < refetch_max_days (default 7)
+        - By default only toplevel posts, comments optional via settings
         """
         tasks = []
         now = time.time()
-        cutoff_initial = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)  # 90 Tage
-        cutoff_refetch = now - (7 * 86400)  # 7 Tage
+        settings = cls._get_likes_settings()
 
-        valid_ids = cls._get_valid_fetch_ids('likes', slug, 'post_skool_id')
+        cutoff_initial = now - (settings['initial_max_days'] * 86400)
+        cutoff_refetch = now - (settings['refetch_max_days'] * 86400)
+        stale_threshold = int(now) - (settings['stale_days'] * 86400)
+
+        # Use custom stale threshold for likes
+        rows = Fetch.get_list(
+            "SELECT post_skool_id FROM fetch WHERE type = ? AND community_slug = ? AND status = 'ok' AND created_at > ?",
+            ['likes', slug, stale_threshold]
+        )
+        valid_ids = {r.post_skool_id for r in rows}
         ever_fetched_ids = cls._get_ever_fetched_ids('likes', slug, 'post_skool_id')
 
-        posts = Post.get_list(
-            "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0",
-            [slug]
-        )
+        # Build SQL based on whether comments should be fetched
+        if settings['fetch_comments']:
+            sql = "SELECT * FROM post WHERE community_slug = ? AND COALESCE(upvotes, 0) > 0"
+        else:
+            sql = "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0"
+        posts = Post.get_list(sql, [slug])
+
         for p in posts:
             # Skip wenn bereits gültiger Fetch existiert
             if p.skool_id in valid_ids:
@@ -259,11 +306,18 @@ class FetchTask(Model):
                 except:
                     pass
 
+            is_comment = not getattr(p, 'is_toplevel', False)
+            post_type = "comment" if is_comment else "post"
+            if was_fetched_before:
+                comment = f"Re-fetch likes for {post_type} '{p.name}' ({p.upvotes} likes, <{settings['refetch_max_days']}d old)"
+            else:
+                comment = f"Initial likes fetch for {post_type} '{p.name}' ({p.upvotes} likes, <{settings['initial_max_days']}d old)"
             tasks.append(cls({
                 "type": "likes",
                 "communitySlug": slug,
                 "postSkoolHexId": p.skool_id,
                 "postName": p.name,
+                "comment": comment,
             }))
         return tasks
 
@@ -301,6 +355,7 @@ class FetchTask(Model):
                 tasks.append(cls({
                     "type": "community_about",
                     "communitySlug": oc.slug,
+                    "comment": f"About page for '{oc.slug}' ({oc.shared_user_count} shared members)",
                 }))
 
         return tasks
