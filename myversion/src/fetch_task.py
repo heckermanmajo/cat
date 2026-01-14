@@ -3,6 +3,7 @@ import time
 
 from .config_entry import ConfigEntry
 from .fetch import Fetch
+from .other_community import OtherCommunity
 from model import Model
 from .post import Post
 from .user import User
@@ -16,6 +17,7 @@ class FetchStaleInformation:
     PROFILE = 7 * 24   # singular, wie der fetch type
     COMMENTS = 7 * 24
     LIKES = 7 * 24
+    COMMUNITY_ABOUT = 30 * 24  # About pages selten aktualisiert
 
     # Harte Cutoffs: ignoriere ältere Daten komplett
     MAX_POST_AGE_DAYS = 90        # comments/likes nur für Posts < 3 Monate
@@ -144,6 +146,9 @@ class FetchTask(Model):
         tasks.extend(cls._generate_profile_tasks(slug))
         tasks.extend(cls._generate_comment_tasks(slug))
         tasks.extend(cls._generate_likes_tasks(slug))
+
+        # Phase 3: community about pages for other communities above threshold
+        tasks.extend(cls._generate_community_about_tasks())
         return tasks
 
     @classmethod
@@ -260,4 +265,42 @@ class FetchTask(Model):
                 "postSkoolHexId": p.skool_id,
                 "postName": p.name,
             }))
+        return tasks
+
+    @classmethod
+    def _generate_community_about_tasks(cls) -> List["FetchTask"]:
+        """
+        Generate tasks to fetch about pages for other communities
+        that have at least min_shared_members users.
+        """
+        tasks = []
+
+        # Get min_shared_members threshold from settings (default 10)
+        min_threshold_entry = ConfigEntry.getByKey('min_shared_members')
+        min_threshold = 10
+        if min_threshold_entry and min_threshold_entry.value:
+            try:
+                min_threshold = int(min_threshold_entry.value)
+            except:
+                pass
+
+        # Get communities above threshold that haven't been fetched recently
+        threshold = cls._stale_threshold('community_about')
+        communities = OtherCommunity.get_list(
+            "SELECT * FROM othercommunity WHERE shared_user_count >= ? AND about_fetched = 0",
+            [min_threshold]
+        )
+
+        for oc in communities:
+            # Check if we have a recent fetch for this community's about page
+            recent_fetch = Fetch.get_list(
+                "SELECT * FROM fetch WHERE type = 'community_about' AND community_slug = ? AND status = 'ok' AND created_at > ?",
+                [oc.slug, threshold]
+            )
+            if not recent_fetch:
+                tasks.append(cls({
+                    "type": "community_about",
+                    "communitySlug": oc.slug,
+                }))
+
         return tasks

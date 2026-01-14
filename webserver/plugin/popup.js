@@ -1,5 +1,7 @@
 const loadBtn = document.getElementById('loadBtn');
 const runBtn = document.getElementById('runBtn');
+const stopBtn = document.getElementById('stopBtn');
+const resumeBtn = document.getElementById('resumeBtn');
 const tasksDiv = document.getElementById('tasks');
 const statusDiv = document.getElementById('status');
 let pollInterval = null;
@@ -22,8 +24,19 @@ function stopPolling() {
 
 function updateProgress() {
     browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
+        console.log('[popup] State:', state);
         if (state && state.isRunning && state.totalTasks > 0) {
             log('Fetching ' + state.currentTaskIndex + ' / ' + state.totalTasks + '...');
+            stopBtn.disabled = false;
+            resumeBtn.disabled = true;
+        } else if (state && state.isPaused) {
+            stopPolling();
+            log('Paused at task ' + state.currentTaskIndex + '. ' + state.results.length + ' done.');
+            renderResults(state.results);
+            stopBtn.disabled = true;
+            resumeBtn.disabled = false;
+            runBtn.disabled = true;
+            loadBtn.disabled = false;
         } else if (state && !state.isRunning) {
             stopPolling();
             if (state.results && state.results.length) {
@@ -32,6 +45,8 @@ function updateProgress() {
             }
             runBtn.disabled = false;
             loadBtn.disabled = false;
+            stopBtn.disabled = true;
+            resumeBtn.disabled = true;
         }
     });
 }
@@ -78,37 +93,115 @@ loadBtn.onclick = function() {
 };
 
 runBtn.onclick = function() {
+    console.log('[popup] Run clicked');
     log('Starte...');
     runBtn.disabled = true;
     loadBtn.disabled = true;
+    stopBtn.disabled = false;
+    resumeBtn.disabled = true;
 
     // Kurz warten damit der erste Task startet, dann polling
     setTimeout(startPolling, 500);
 
     browser.runtime.sendMessage({ type: 'RUN_TASKS' })
         .then(function(res) {
+            console.log('[popup] RUN_TASKS response:', res);
             stopPolling();
             if (!res) {
                 log('Keine Antwort');
             } else if (res.error) {
                 log('Fehler: ' + res.error);
+            } else if (res.paused) {
+                log('Paused. ' + res.results.length + ' done.');
+                renderResults(res.results);
+                resumeBtn.disabled = false;
+                return;
             } else {
                 renderResults(res.results);
                 log('Fertig! ' + res.results.length + ' Tasks ausgeführt');
             }
             runBtn.disabled = false;
             loadBtn.disabled = false;
+            stopBtn.disabled = true;
+            resumeBtn.disabled = true;
         })
         .catch(function(e) {
+            console.error('[popup] RUN_TASKS error:', e);
             stopPolling();
             log('Fehler: ' + e.message);
             runBtn.disabled = false;
             loadBtn.disabled = false;
+            stopBtn.disabled = true;
+        });
+};
+
+stopBtn.onclick = function() {
+    console.log('[popup] Stop clicked');
+    log('Stopping...');
+    stopBtn.disabled = true;
+
+    browser.runtime.sendMessage({ type: 'STOP_TASKS' })
+        .then(function(res) {
+            console.log('[popup] STOP_TASKS response:', res);
+            if (res && res.ok) {
+                log('Stopping after current task...');
+            } else {
+                log('Stop failed: ' + (res ? res.message : 'No response'));
+                stopBtn.disabled = false;
+            }
+        })
+        .catch(function(e) {
+            console.error('[popup] STOP_TASKS error:', e);
+            log('Stop error: ' + e.message);
+            stopBtn.disabled = false;
+        });
+};
+
+resumeBtn.onclick = function() {
+    console.log('[popup] Resume clicked');
+    log('Resuming...');
+    resumeBtn.disabled = true;
+    stopBtn.disabled = false;
+    loadBtn.disabled = true;
+
+    setTimeout(startPolling, 500);
+
+    browser.runtime.sendMessage({ type: 'RESUME_TASKS' })
+        .then(function(res) {
+            console.log('[popup] RESUME_TASKS response:', res);
+            stopPolling();
+            if (!res) {
+                log('Keine Antwort');
+            } else if (res.error) {
+                log('Fehler: ' + res.error);
+            } else if (res.paused) {
+                log('Paused again. ' + res.results.length + ' done.');
+                renderResults(res.results);
+                resumeBtn.disabled = false;
+                stopBtn.disabled = true;
+                return;
+            } else {
+                renderResults(res.results);
+                log('Fertig! ' + res.results.length + ' Tasks ausgeführt');
+            }
+            runBtn.disabled = false;
+            loadBtn.disabled = false;
+            stopBtn.disabled = true;
+            resumeBtn.disabled = true;
+        })
+        .catch(function(e) {
+            console.error('[popup] RESUME_TASKS error:', e);
+            stopPolling();
+            log('Fehler: ' + e.message);
+            resumeBtn.disabled = false;
+            loadBtn.disabled = false;
+            stopBtn.disabled = true;
         });
 };
 
 // Load initial state
 browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
+    console.log('[popup] Initial state:', state);
     if (state && state.tasks && state.tasks.length) renderTasks(state.tasks);
     if (state && state.results && state.results.length) renderResults(state.results);
     runBtn.disabled = !(state && state.tasks && state.tasks.length);
@@ -118,6 +211,17 @@ browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
         log('Fetching ' + state.currentTaskIndex + ' / ' + state.totalTasks + '...');
         runBtn.disabled = true;
         loadBtn.disabled = true;
+        stopBtn.disabled = false;
+        resumeBtn.disabled = true;
         startPolling();
+    } else if (state && state.isPaused) {
+        log('Paused at task ' + state.currentTaskIndex + '. ' + state.results.length + ' done.');
+        runBtn.disabled = true;
+        loadBtn.disabled = false;
+        stopBtn.disabled = true;
+        resumeBtn.disabled = false;
+    } else {
+        stopBtn.disabled = true;
+        resumeBtn.disabled = true;
     }
 });

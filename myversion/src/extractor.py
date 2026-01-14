@@ -10,6 +10,7 @@ from .user import User
 from .post import Post
 from .profile import Profile
 from .leaderboard import Leaderboard
+from .other_community import OtherCommunity
 from model import Model
 
 
@@ -27,24 +28,27 @@ def extract_from_fetch(fetch: Fetch) -> dict:
     """
     Extrahiert Entitäten aus einem Fetch.
     Löscht vorher alle alten Einträge dieses Fetches.
-    Returns: {'users': int, 'posts': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int}
+    Returns: {'users': int, 'posts': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int, 'other_communities': int}
     """
-    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
+    result = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     if fetch.type == 'members':
         result['users'] = _extract_users(fetch)
     elif fetch.type == 'posts':
         result['posts'] = _extract_posts(fetch)
     elif fetch.type == 'profile':
         result['profiles'] = _extract_profile(fetch)
+        result['other_communities'] = _extract_other_communities(fetch)
     elif fetch.type == 'leaderboard':
         result['leaderboard'] = _extract_leaderboard(fetch)
         # Auto-apply leaderboard to users
         result['leaderboard_applied'] = apply_leaderboard_to_users(fetch.community_slug)
+    elif fetch.type == 'community_about':
+        _extract_community_about(fetch)
     return result
 
 def extract_all_fetches() -> dict:
     """Extrahiert aus allen Fetches."""
-    totals = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
+    totals = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     for fetch in Fetch.all():
         result = extract_from_fetch(fetch)
         totals['users'] += result['users']
@@ -52,6 +56,7 @@ def extract_all_fetches() -> dict:
         totals['profiles'] += result['profiles']
         totals['leaderboard'] += result['leaderboard']
         totals['leaderboard_applied'] += result['leaderboard_applied']
+        totals['other_communities'] += result['other_communities']
     return totals
 
 def _extract_users(fetch: Fetch) -> int:
@@ -245,3 +250,110 @@ def apply_leaderboard_to_users(community_slug: str) -> int:
     cursor = conn.execute(sql, [now, community_slug])
     conn.commit()
     return cursor.rowcount
+
+
+def _extract_other_communities(fetch: Fetch) -> int:
+    """
+    Extracts other communities from a profile fetch.
+    Looks in groupsMemberOf for community slugs different from the fetch community.
+    Updates shared_user_count for each discovered community.
+    """
+    data = json.loads(fetch.raw_data) if fetch.raw_data else {}
+    u = data.get('pageProps', {}).get('currentUser', {})
+    if not u:
+        u = data.get('pageProps', {}).get('renderData', {}).get('user', {})
+    if not u:
+        return 0
+
+    pd = u.get('profileData', {})
+    groups = pd.get('groupsMemberOf') or []
+
+    count = 0
+    current_slug = fetch.community_slug
+
+    for group in groups:
+        # 'name' field is the slug (URL identifier), displayName is the readable name
+        slug = group.get('name', '')
+        meta = group.get('metadata', {})
+        display_name = meta.get('displayName', '') or slug
+
+        if not slug or slug == current_slug:
+            continue
+
+        # Check if community already exists
+        existing = OtherCommunity.get_list(
+            "SELECT * FROM othercommunity WHERE slug = ?", [slug]
+        )
+
+        if existing:
+            # Update shared_user_count
+            oc = existing[0]
+            oc.shared_user_count += 1
+            oc.save()
+        else:
+            # Create new entry
+            oc = OtherCommunity({
+                'slug': slug,
+                'name': display_name,
+                'shared_user_count': 1,
+            })
+            oc.save()
+            count += 1
+
+    return count
+
+
+def recalculate_other_community_counts() -> int:
+    """
+    Recalculates shared_user_count for all OtherCommunities
+    based on actual profile data in groupsMemberOf.
+    """
+    # Reset all counts
+    Model.connect().execute("UPDATE othercommunity SET shared_user_count = 0")
+    Model.connect().commit()
+
+    # Get all profiles
+    profiles = Profile.get_list("SELECT * FROM profile", [])
+
+    for profile in profiles:
+        groups = json.loads(profile.groups_member_of) if profile.groups_member_of else []
+        for group in groups:
+            # 'name' field is the slug
+            slug = group.get('name', '')
+            if not slug or slug == profile.community_slug:
+                continue
+
+            Model.connect().execute(
+                "UPDATE othercommunity SET shared_user_count = shared_user_count + 1 WHERE slug = ?",
+                [slug]
+            )
+
+    Model.connect().commit()
+    return OtherCommunity.count()
+
+
+def _extract_community_about(fetch: Fetch) -> None:
+    """
+    Extracts community about page data and updates OtherCommunity record.
+    """
+    data = json.loads(fetch.raw_data) if fetch.raw_data else {}
+
+    # Update the OtherCommunity record
+    existing = OtherCommunity.get_list(
+        "SELECT * FROM othercommunity WHERE slug = ?", [fetch.community_slug]
+    )
+
+    if existing:
+        oc = existing[0]
+        oc.about_fetched = 1
+        oc.about_data = fetch.raw_data or ''
+
+        # Extract name from currentGroup in about page data
+        pp = data.get('pageProps', {})
+        group = pp.get('currentGroup', {})
+        meta = group.get('metadata', {})
+        display_name = meta.get('displayName', '')
+        if display_name:
+            oc.name = display_name
+
+        oc.save()

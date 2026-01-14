@@ -207,12 +207,54 @@
                     const secondaryView = document.getElementById("secondary-view");
                     secondaryView.innerHTML = `<h3>Loading...</h3>`;
                     const user = await User.get(memberId);
-                    secondaryView.innerHTML = `<h3>Profile Details for @${user.name}</h3>`;
-                    secondaryView.innerHTML += `<pre>${JSON.stringify(user, null, 2)}</pre>`
-                    secondaryView.innerHTML += `<h4>POSTS</h4>`;
-                    secondaryView.innerHTML += `<h4>NOTES</h4> Coming soon...`;
-                    secondaryView.innerHTML += `<h4>COMMUNITIES</h4>`;
-                    secondaryView.innerHTML += `<h4>Liked POSTS</h4>`;
+
+                    // Fetch posts and communities in parallel
+                    const [postsRes, communitiesRes] = await Promise.all([
+                        get(`/api/user/${memberId}/posts`),
+                        get(`/api/user/${memberId}/communities`)
+                    ]);
+                    const posts = postsRes.ok ? postsRes.data : [];
+                    const communities = communitiesRes.ok ? communitiesRes.data : [];
+
+                    // Render user info
+                    let html = `<h3>Profile Details for @${user.name}</h3>`;
+                    html += `<small>${user.first_name} ${user.last_name} | Role: ${user.member_role || '-'} | Points: ${user.points || 0}</small>`;
+
+                    // Render communities
+                    html += `<h4>COMMUNITIES (${communities.length})</h4>`;
+                    if (communities.length) {
+                        html += `<div>`;
+                        for (const slug of communities) {
+                            html += `<small style="margin-right: 8px; padding: 2px 6px; background: #eee; border-radius: 4px">${slug}</small>`;
+                        }
+                        html += `</div>`;
+                    } else {
+                        html += `<small>No communities found</small>`;
+                    }
+
+                    // Render posts
+                    html += `<h4>POSTS (${posts.length})</h4>`;
+                    if (posts.length) {
+                        for (const post of posts) {
+                            const meta = post.metadata ? JSON.parse(post.metadata) : {};
+                            const title = meta.title || post.name || '(Untitled)';
+                            html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #3498db">
+                                <b>${title}</b><br>
+                                <small>
+                                    ${post.upvotes || 0} upvotes | ${post.comments || 0} comments |
+                                    ${post.community_slug}
+                                </small>
+                            </article>`;
+                        }
+                    } else {
+                        html += `<small>No posts found</small>`;
+                    }
+
+                    html += `<h4>NOTES</h4><small>Coming soon...</small>`;
+                    html += `<h4>Liked POSTS</h4><small>Coming soon...</small>`;
+                    html += `<details><summary>Raw JSON</summary><pre>${JSON.stringify(user, null, 2)}</pre></details>`;
+
+                    secondaryView.innerHTML = html;
                 })();
             };
 
@@ -232,12 +274,22 @@
                             document.getElementById('secondary-view').innerHTML = `<h3>Loading Posts...</h3>`;
                             /** @type {Post[]} */
                             let data = await Post.all();
-                            let html = "";
+                            let html = `<h3>Posts (${data.length})</h3>`;
                             for (const post of data) {
-
+                                const meta = post.metadata ? JSON.parse(post.metadata) : {};
+                                const title = meta.title || post.name || '(Untitled)';
+                                const content = meta.content || '';
+                                const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
+                                const createdAt = post.skool_created_at ? new Date(post.skool_created_at).toLocaleDateString() : '-';
                                 html += `
-                                    <article>
-                                        <b>${post.name}</b> by ${post.user_name}<br>
+                                    <article style="margin: 4px 0; padding: 8px; border-left: 3px solid #3498db">
+                                        <b>${title}</b><br>
+                                        <small style="color: #666">${preview}</small><br>
+                                        <small>
+                                            by <b>${post.user_name || '-'}</b> |
+                                            ${post.upvotes || 0} upvotes | ${post.comments || 0} comments |
+                                            ${post.community_slug} | ${createdAt}
+                                        </small>
                                     </article>
                                 `;
                             }
@@ -245,7 +297,28 @@
                         })();
                     } break;
                     case "communities": {
-                        document.getElementById('secondary-view').innerText = "COMMUNITIES";
+                        (async()=>{
+                            const view = document.getElementById('secondary-view');
+                            view.innerHTML = `<h3>Loading Communities...</h3>`;
+                            const res = await get('/api/other-communities');
+                            if (!res.ok) {
+                                view.innerHTML = `<h3>Error loading communities</h3>`;
+                                return;
+                            }
+                            let html = `<h3>Other Communities (${res.data.length})</h3>`;
+                            html += `<small>Discovered from profile fetches</small><br><br>`;
+                            for (const c of res.data) {
+                                const name = c.name || c.slug;
+                                const fetched = c.about_fetched ? '(details fetched)' : '';
+                                html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #27ae60; cursor: pointer"
+                                    onclick="changeCurrentCommunity('${c.slug}')">
+                                    <b>${name}</b> <small style="color: #888">${fetched}</small><br>
+                                    <small>${c.shared_user_count} shared members | slug: ${c.slug}</small>
+                                </article>`;
+                            }
+                            if (!res.data.length) html += `<small>No other communities found yet. Fetch some profiles first.</small>`;
+                            view.innerHTML = html;
+                        })();
                     } break;
                     case "export": {
                         document.getElementById('secondary-view').innerText = "EXPORT";

@@ -9,6 +9,7 @@ from src.user import User
 from src.post import Post
 from src.profile import Profile
 from src.leaderboard import Leaderboard
+from src.other_community import OtherCommunity
 from src import extractor
 from src.members_filter import MembersFilter
 
@@ -23,6 +24,7 @@ User.register(app)
 Post.register(app)
 Profile.register(app)
 Leaderboard.register(app)
+OtherCommunity.register(app)
 
 @app.route('/api/fetch-tasks')
 def get_fetch_tasks(): return jsonify([t.to_dict() for t in FetchTask.generateFetchTasks()])
@@ -52,7 +54,7 @@ def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
     results = request.json.get('results', [])
     saved = []
-    extracted = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0}
+    extracted = {'users': 0, 'posts': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
@@ -80,6 +82,7 @@ def post_fetch_result():
         extracted['profiles'] += ex['profiles']
         extracted['leaderboard'] += ex['leaderboard']
         extracted['leaderboard_applied'] += ex['leaderboard_applied']
+        extracted['other_communities'] += ex['other_communities']
     return jsonify({'saved': len(saved), 'fetches': saved, 'extracted': extracted}), 201
 
 @app.route('/api/extract/<int:fetch_id>', methods=['POST'])
@@ -117,10 +120,57 @@ def filter_users():
     users = User.filtered(f)
     return jsonify([u.to_dict() for u in users])
 
+@app.route('/api/user/<int:user_id>/posts')
+def get_user_posts(user_id):
+    """Get all posts by a user (via their skool_id)."""
+    user = User.by_id(user_id)
+    if not user: return 'User not found', 404
+    posts = Post.get_list(
+        "SELECT * FROM post WHERE user_id = ? ORDER BY created_at DESC",
+        [user.skool_id]
+    )
+    return jsonify([p.to_dict() for p in posts])
+
+@app.route('/api/user/<int:user_id>/communities')
+def get_user_communities(user_id):
+    """Get all communities where a user (by skool_id) is a member."""
+    user = User.by_id(user_id)
+    if not user: return 'User not found', 404
+    rows = Model.query(
+        "SELECT DISTINCT community_slug FROM user WHERE skool_id = ? AND community_slug != ''",
+        [user.skool_id]
+    )
+    return jsonify([r['community_slug'] for r in rows])
+
+@app.route('/api/shared-communities', methods=['POST'])
+def get_shared_communities():
+    """Get communities shared by given skool_ids, with user counts, sorted descending."""
+    skool_ids = request.json.get('skool_ids', [])
+    if not skool_ids:
+        return jsonify([])
+    placeholders = ','.join(['?'] * len(skool_ids))
+    rows = Model.query(
+        f"""SELECT community_slug, COUNT(DISTINCT skool_id) as user_count
+            FROM user
+            WHERE skool_id IN ({placeholders}) AND community_slug != ''
+            GROUP BY community_slug
+            ORDER BY user_count DESC""",
+        skool_ids
+    )
+    return jsonify(rows)
+
+@app.route('/api/other-communities')
+def get_other_communities():
+    """Get all discovered communities from profile fetches, sorted by shared_user_count."""
+    communities = OtherCommunity.get_list(
+        "SELECT * FROM othercommunity ORDER BY shared_user_count DESC", []
+    )
+    return jsonify([c.to_dict() for c in communities])
+
 @app.route('/')
 def index(): return send_from_directory('static', 'index.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename): return send_from_directory('static', filename)
 
-if __name__ == '__main__': app.run(debug=True, port=3000)
+if __name__ == '__main__': app.run(debug=True, port=3000, threaded=False)

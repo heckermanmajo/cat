@@ -20,6 +20,7 @@
                     configEntriesList.insertAdjacentHTML("beforeend", entryHtml);
                 }
                 lib.setupThemeOnLoad().then();
+                loadMinSharedMembers().then();
                 communityListData = await lib.loadAllCommunities();
                 {
                     let index = 0;
@@ -49,6 +50,17 @@
                 listOfCommunityInputs.insertAdjacentHTML("beforeend", html);
                 communityListData.push("");
             }
+
+            // min_shared_members setting
+            const minSharedMembersKey = "min_shared_members";
+            let loadMinSharedMembers = async () => {
+                const val = await ConfigEntry.get(minSharedMembersKey);
+                document.getElementById("minSharedMembersInput").value = val || "10";
+            };
+            let updateMinSharedMembers = () => {
+                const val = document.getElementById("minSharedMembersInput").value || "10";
+                ConfigEntry.set(minSharedMembersKey, val).then();
+            };
         </script>
         <title>Cat</title>
     </head>
@@ -62,6 +74,12 @@
 
             <article id="listOfCommunityInputs">
                 <button onclick="addCommunity()"> Add new Community </button>
+            </article>
+
+            <article>
+                <h4>Other Community Fetch Threshold</h4>
+                <label>Min shared members to fetch about page:</label>
+                <input id="minSharedMembersInput" type="number" min="1" value="10" onchange="updateMinSharedMembers()">
             </article>
 
             <article id="config-entries-list">

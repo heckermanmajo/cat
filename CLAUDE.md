@@ -24,6 +24,8 @@ LESE immer:
  - webserver/core.php -> dient als Beispiel meines 'dichten und simplen' code styles
  - anleitungen/*
 
+myversion/schemas hat die json schemas der Rohdaten die wir vom Plugin(von skool.com) bekommen.
+
 Jede frontend seite ist eine html seite mit eigenem JS. Entkopplung ist 
 wichitger als "DRY". Besonders bei dem html seiten. Jede seite soll 'self contained'
 sein -> sie dürfen sich aber /static/api.js und /staic/app.js teilen und ggf. weitere 
