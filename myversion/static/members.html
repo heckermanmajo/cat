@@ -210,28 +210,41 @@
                     secondaryView.innerHTML = `<h3>Loading...</h3>`;
                     const user = await User.get(memberId);
 
-                    // Fetch posts and communities in parallel
-                    const [postsRes, communitiesRes] = await Promise.all([
+                    // Fetch posts, communities, and liked posts in parallel
+                    const [postsRes, communitiesRes, profileCommunitiesRes, likedPostsRes] = await Promise.all([
                         get(`/api/user/${memberId}/posts`),
-                        get(`/api/user/${memberId}/communities`)
+                        get(`/api/user/${memberId}/communities`),
+                        get(`/api/user/${memberId}/profile-communities`),
+                        get(`/api/user/${memberId}/liked-posts`)
                     ]);
                     const posts = postsRes.ok ? postsRes.data : [];
                     const communities = communitiesRes.ok ? communitiesRes.data : [];
+                    const profileCommunities = profileCommunitiesRes.ok ? profileCommunitiesRes.data : [];
+                    const likedPosts = likedPostsRes.ok ? likedPostsRes.data : [];
 
                     // Render user info
                     let html = `<h3>Profile Details for @${user.name}</h3>`;
                     html += `<small>${user.first_name} ${user.last_name} | Role: ${user.member_role || '-'} | Points: ${user.points || 0}</small>`;
 
-                    // Render communities
-                    html += `<h4>COMMUNITIES (${communities.length})</h4>`;
-                    if (communities.length) {
+                    // Render communities from profile (more complete)
+                    html += `<h4>COMMUNITIES (${profileCommunities.length || communities.length})</h4>`;
+                    if (profileCommunities.length) {
+                        html += `<div>`;
+                        for (const c of profileCommunities) {
+                            html += `<small style="margin-right: 8px; margin-bottom: 4px; padding: 2px 6px; background: #eee; border-radius: 4px; display: inline-block; cursor: pointer"
+                                onclick="changeCurrentCommunity('${c.slug}')">${c.name}</small>`;
+                        }
+                        html += `</div>`;
+                    } else if (communities.length) {
+                        // Fallback to user table communities
                         html += `<div>`;
                         for (const slug of communities) {
-                            html += `<small style="margin-right: 8px; padding: 2px 6px; background: #eee; border-radius: 4px">${slug}</small>`;
+                            html += `<small style="margin-right: 8px; padding: 2px 6px; background: #eee; border-radius: 4px; cursor: pointer"
+                                onclick="changeCurrentCommunity('${slug}')">${slug}</small>`;
                         }
                         html += `</div>`;
                     } else {
-                        html += `<small>No communities found</small>`;
+                        html += `<small>No communities found (profile not fetched yet)</small>`;
                     }
 
                     // Render posts
@@ -252,8 +265,26 @@
                         html += `<small>No posts found</small>`;
                     }
 
+                    // Render liked posts
+                    html += `<h4>LIKED POSTS (${likedPosts.length})</h4>`;
+                    if (likedPosts.length) {
+                        for (const post of likedPosts) {
+                            const meta = post.metadata ? JSON.parse(post.metadata) : {};
+                            const title = meta.title || post.name || '(Untitled)';
+                            html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #e74c3c">
+                                <b>${title}</b><br>
+                                <small>
+                                    by <b>${post.user_name || '-'}</b> |
+                                    ${post.upvotes || 0} upvotes | ${post.comments || 0} comments |
+                                    ${post.community_slug}
+                                </small>
+                            </article>`;
+                        }
+                    } else {
+                        html += `<small>No liked posts found (likes not fetched yet)</small>`;
+                    }
+
                     html += `<h4>NOTES</h4><small>Coming soon...</small>`;
-                    html += `<h4>Liked POSTS</h4><small>Coming soon...</small>`;
                     html += `<details><summary>Raw JSON</summary><pre>${JSON.stringify(user, null, 2)}</pre></details>`;
 
                     secondaryView.innerHTML = html;

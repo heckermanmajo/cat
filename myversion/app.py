@@ -9,6 +9,7 @@ from src.user import User
 from src.post import Post
 from src.profile import Profile
 from src.leaderboard import Leaderboard
+from src.like import Like
 from src.other_community import OtherCommunity
 from src import extractor
 from src.members_filter import MembersFilter
@@ -24,6 +25,7 @@ User.register(app)
 Post.register(app)
 Profile.register(app)
 Leaderboard.register(app)
+Like.register(app)
 OtherCommunity.register(app)
 
 @app.route('/api/fetch-tasks')
@@ -54,7 +56,7 @@ def post_fetch_result():
     """Empfängt Results vom Plugin und speichert sie als Fetch."""
     results = request.json.get('results', [])
     saved = []
-    extracted = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    extracted = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0, 'likes': 0}
     for r in results:
         task = r.get('task', {})
         result = r.get('result', {})
@@ -84,6 +86,7 @@ def post_fetch_result():
         extracted['leaderboard'] += ex['leaderboard']
         extracted['leaderboard_applied'] += ex['leaderboard_applied']
         extracted['other_communities'] += ex['other_communities']
+        extracted['likes'] += ex['likes']
     return jsonify({'saved': len(saved), 'fetches': saved, 'extracted': extracted}), 201
 
 @app.route('/api/extract/<int:fetch_id>', methods=['POST'])
@@ -126,7 +129,7 @@ def extract_batch():
            LIMIT ? OFFSET ?""",
         [limit, offset]
     )
-    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0, 'likes': 0}
     Model.begin_batch()
     for f in fetches:
         ex = extractor.extract_from_fetch(f)
@@ -137,6 +140,7 @@ def extract_batch():
         result['leaderboard'] += ex['leaderboard']
         result['leaderboard_applied'] += ex['leaderboard_applied']
         result['other_communities'] += ex['other_communities']
+        result['likes'] += ex['likes']
     Model.end_batch()
     return jsonify({'extracted': result, 'processed': len(fetches)})
 
@@ -214,6 +218,57 @@ def get_user_communities(user_id):
         [user.skool_id]
     )
     return jsonify([r['community_slug'] for r in rows])
+
+@app.route('/api/user/<int:user_id>/profile-communities')
+def get_user_profile_communities(user_id):
+    """Get all communities from profile.groups_member_of (more complete than user table)."""
+    user = User.by_id(user_id)
+    if not user: return 'User not found', 404
+    # Get latest profile for this user
+    profiles = Profile.get_list(
+        "SELECT * FROM profile WHERE skool_id = ? ORDER BY fetched_at DESC LIMIT 1",
+        [user.skool_id]
+    )
+    if not profiles:
+        return jsonify([])
+    profile = profiles[0]
+    groups = json.loads(profile.groups_member_of) if profile.groups_member_of else []
+    # Return list of {slug, name} objects
+    result = []
+    for g in groups:
+        slug = g.get('name', '')
+        meta = g.get('metadata', {})
+        display_name = meta.get('displayName', '') or slug
+        if slug:
+            result.append({'slug': slug, 'name': display_name})
+    return jsonify(result)
+
+@app.route('/api/user/<int:user_id>/liked-posts')
+def get_user_liked_posts(user_id):
+    """Get all posts that a user has liked."""
+    user = User.by_id(user_id)
+    if not user: return 'User not found', 404
+    # Get all post_skool_ids this user has liked
+    likes = Like.get_list(
+        "SELECT DISTINCT post_skool_id FROM like WHERE user_skool_id = ?",
+        [user.skool_id]
+    )
+    if not likes:
+        return jsonify([])
+    # Get the posts (latest version per skool_id)
+    post_ids = [l.post_skool_id for l in likes]
+    posts = []
+    batch_size = 400
+    for i in range(0, len(post_ids), batch_size):
+        batch = post_ids[i:i + batch_size]
+        placeholders = ','.join(['?'] * len(batch))
+        posts.extend(Post.get_list(
+            f"""SELECT * FROM post WHERE skool_id IN ({placeholders})
+                AND id IN (SELECT MAX(id) FROM post GROUP BY skool_id)""",
+            batch
+        ))
+    posts.sort(key=lambda p: p.id, reverse=True)
+    return jsonify([p.to_dict() for p in posts])
 
 @app.route('/api/shared-communities', methods=['POST'])
 def get_shared_communities():

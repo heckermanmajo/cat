@@ -10,6 +10,7 @@ from .user import User
 from .post import Post
 from .profile import Profile
 from .leaderboard import Leaderboard
+from .like import Like
 from .other_community import OtherCommunity
 from model import Model
 
@@ -28,15 +29,17 @@ def extract_from_fetch(fetch: Fetch) -> dict:
     """
     Extrahiert Entitäten aus einem Fetch.
     Löscht vorher alle alten Einträge dieses Fetches.
-    Returns: {'users': int, 'posts': int, 'comments': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int, 'other_communities': int}
+    Returns: {'users': int, 'posts': int, 'comments': int, 'profiles': int, 'leaderboard': int, 'leaderboard_applied': int, 'other_communities': int, 'likes': int}
     """
-    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    result = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0, 'likes': 0}
     if fetch.type == 'members':
         result['users'] = _extract_users(fetch)
     elif fetch.type == 'posts':
         result['posts'] = _extract_posts(fetch)
     elif fetch.type == 'comments':
         result['comments'] = _extract_comments(fetch)
+    elif fetch.type == 'likes':
+        result['likes'] = _extract_likes(fetch)
     elif fetch.type == 'profile':
         result['profiles'] = _extract_profile(fetch)
         result['other_communities'] = _extract_other_communities(fetch)
@@ -50,7 +53,7 @@ def extract_from_fetch(fetch: Fetch) -> dict:
 
 def extract_all_fetches() -> dict:
     """Extrahiert aus allen Fetches."""
-    totals = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0}
+    totals = {'users': 0, 'posts': 0, 'comments': 0, 'profiles': 0, 'leaderboard': 0, 'leaderboard_applied': 0, 'other_communities': 0, 'likes': 0}
     for fetch in Fetch.all():
         result = extract_from_fetch(fetch)
         totals['users'] += result['users']
@@ -60,6 +63,7 @@ def extract_all_fetches() -> dict:
         totals['leaderboard'] += result['leaderboard']
         totals['leaderboard_applied'] += result['leaderboard_applied']
         totals['other_communities'] += result['other_communities']
+        totals['likes'] += result['likes']
     return totals
 
 def _extract_users(fetch: Fetch) -> int:
@@ -384,3 +388,34 @@ def _extract_community_about(fetch: Fetch) -> None:
             oc.name = display_name
 
         oc.save()
+
+
+def _extract_likes(fetch: Fetch) -> int:
+    """
+    Extrahiert Likes aus einem likes-Fetch (api2.skool.com/posts/{id}/vote-users).
+    Format: { users: [...] } - Liste von Usern die den Post geliked haben.
+    """
+    # Alte Einträge dieses Fetches löschen
+    Model.connect().execute("DELETE FROM like WHERE fetch_id = ?", [fetch.id])
+
+    data = json.loads(fetch.raw_data) if fetch.raw_data else {}
+    # api2.skool.com Format: direkt users array (kein pageProps wrapper)
+    users = data.get('users', [])
+    now = int(time.time())
+    count = 0
+
+    for u in users:
+        like = Like({
+            'fetch_id': fetch.id,
+            'fetched_at': now,
+            'community_slug': fetch.community_slug,
+            'post_skool_id': fetch.post_skool_id,
+            'user_skool_id': u.get('id', ''),
+            'user_name': u.get('name', ''),
+            'user_first_name': u.get('first_name', '') or u.get('firstName', ''),
+            'user_last_name': u.get('last_name', '') or u.get('lastName', ''),
+        })
+        like.save()
+        count += 1
+
+    return count
