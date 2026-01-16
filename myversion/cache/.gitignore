@@ -1,0 +1,3 @@
+# Cache images - not tracked
+images/*
+!.gitignore

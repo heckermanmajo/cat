@@ -10,18 +10,63 @@ from .user import User
 
 
 class FetchStaleInformation:
-    """Stale-Zeiten in Stunden. Namen müssen mit fetch type übereinstimmen."""
-    POSTS = 24
-    MEMBERS = 24
-    LEADERBOARD = 24
-    PROFILE = 7 * 24   # singular, wie der fetch type
-    COMMENTS = 7 * 24
-    LIKES = 2 * 24     # default 2 days, configurable via settings
-    COMMUNITY_ABOUT = 30 * 24  # About pages selten aktualisiert
+    """
+    Stale times in hours. Names must match fetch type.
+    All values are configurable via ConfigEntry (keys: stale_base, stale_profile, stale_comments, etc.)
+    """
+    # Defaults (used if no ConfigEntry exists)
+    _DEFAULTS = {
+        'stale_base': 24,           # members, posts, leaderboard
+        'stale_profile': 7 * 24,    # profiles
+        'stale_comments': 7 * 24,   # comments
+        'stale_likes': 2 * 24,      # likes (also via likes_stale_days)
+        'stale_community_about': 30 * 24,
+        'max_post_age_days': 90,
+        'max_user_inactive_days': 90,
+    }
 
-    # Harte Cutoffs: ignoriere ältere Daten komplett (defaults, likes are configurable)
-    MAX_POST_AGE_DAYS = 90        # comments/likes nur für Posts < 3 Monate
-    MAX_USER_INACTIVE_DAYS = 90   # profiles nur für User online < 3 Monate
+    @classmethod
+    def _get_setting(cls, key: str) -> int:
+        """Read setting from ConfigEntry or return default. 0 or empty = use default."""
+        entry = ConfigEntry.getByKey(key)
+        if entry and entry.value:
+            try:
+                val = int(entry.value)
+                if val > 0:  # 0 means "use default"
+                    return val
+            except:
+                pass
+        return cls._DEFAULTS.get(key, 24)
+
+    @classmethod
+    def get_stale_hours(cls, fetch_type: str) -> int:
+        """Get stale time in hours for a fetch type."""
+        if fetch_type in ('members', 'posts', 'leaderboard'):
+            return cls._get_setting('stale_base')
+        elif fetch_type == 'profile':
+            return cls._get_setting('stale_profile')
+        elif fetch_type == 'comments':
+            return cls._get_setting('stale_comments')
+        elif fetch_type == 'likes':
+            # likes_stale_days takes precedence (in days, convert to hours)
+            days = ConfigEntry.getByKey('likes_stale_days')
+            if days and days.value:
+                try:
+                    return int(days.value) * 24
+                except:
+                    pass
+            return cls._DEFAULTS['stale_likes']
+        elif fetch_type == 'community_about':
+            return cls._DEFAULTS['stale_community_about']
+        return 24
+
+    @classmethod
+    def get_max_post_age_days(cls) -> int:
+        return cls._get_setting('max_post_age_days')
+
+    @classmethod
+    def get_max_user_inactive_days(cls) -> int:
+        return cls._get_setting('max_user_inactive_days')
 
 
 class FetchTask(Model):
@@ -49,7 +94,7 @@ class FetchTask(Model):
     @staticmethod
     def _stale_threshold(fetch_type: str) -> int:
         """Returns unix timestamp threshold - fetches older than this are stale."""
-        hours = getattr(FetchStaleInformation, fetch_type.upper(), 24)
+        hours = FetchStaleInformation.get_stale_hours(fetch_type)
         return int(time.time()) - (hours * 3600)
 
     @staticmethod
@@ -161,10 +206,11 @@ class FetchTask(Model):
 
     @classmethod
     def _generate_profile_tasks(cls, slug: str) -> List["FetchTask"]:
-        """Profile tasks für User die in den letzten 3 Monaten online waren."""
+        """Profile tasks for users active within max_user_inactive_days."""
         tasks = []
         now = time.time()
-        cutoff = now - (FetchStaleInformation.MAX_USER_INACTIVE_DAYS * 86400)
+        max_inactive = FetchStaleInformation.get_max_user_inactive_days()
+        cutoff = now - (max_inactive * 86400)
         valid_ids = cls._get_valid_fetch_ids('profile', slug, 'user_skool_id')
 
         users = User.get_list("SELECT * FROM user WHERE community_slug = ?", [slug])
@@ -185,32 +231,47 @@ class FetchTask(Model):
                     "communitySlug": slug,
                     "userSkoolHexId": u.skool_id,
                     "userName": u.name,
-                    "comment": f"Profile for user '{u.name}' (active in last 90 days)",
+                    "comment": f"Profile for user '{u.name}' (active in last {max_inactive} days)",
                 }))
         return tasks
 
     @classmethod
     def _generate_comment_tasks(cls, slug: str) -> List["FetchTask"]:
-        """Comment tasks für Posts < 3 Monate mit comments > 0."""
+        """Comment tasks for posts younger than comments_max_post_age_days with comments > 0."""
         tasks = []
         now = time.time()
-        cutoff = now - (FetchStaleInformation.MAX_POST_AGE_DAYS * 86400)
+
+        # Get comments-specific cutoff (default 30 days)
+        entry = ConfigEntry.getByKey('comments_max_post_age_days')
+        max_days = 30
+        if entry and entry.value:
+            try:
+                max_days = int(entry.value)
+            except:
+                pass
+
+        # If 0, skip all comment fetching
+        if max_days <= 0:
+            return tasks
+
+        cutoff = now - (max_days * 86400)
         valid_ids = cls._get_valid_fetch_ids('comments', slug, 'post_skool_id')
 
+        from datetime import datetime
         posts = Post.get_list(
             "SELECT * FROM post WHERE community_slug = ? AND COALESCE(comments, 0) > 0",
             [slug]
         )
         for p in posts:
-            # Skip wenn Post zu alt
-            if p.skool_created_at:
-                try:
-                    from datetime import datetime
-                    created_ts = datetime.fromisoformat(p.skool_created_at.replace('Z', '+00:00')).timestamp()
-                    if created_ts < cutoff:
-                        continue
-                except:
-                    pass
+            # Skip if no date or too old
+            if not p.skool_created_at:
+                continue
+            try:
+                created_ts = datetime.fromisoformat(p.skool_created_at.replace('Z', '+00:00')).timestamp()
+                if created_ts < cutoff:
+                    continue
+            except:
+                continue  # Skip if date parsing fails
 
             if p.skool_id not in valid_ids:
                 tasks.append(cls({
@@ -219,7 +280,7 @@ class FetchTask(Model):
                     "postSkoolHexId": p.skool_id,
                     "postName": p.name,
                     "groupSkoolId": p.group_id,  # Skool UUID for api2.skool.com
-                    "comment": f"Comments for post '{p.name}' ({p.comments} comments, <90 days old)",
+                    "comment": f"Comments for post '{p.name}' ({p.comments} comments, <{max_days}d old)",
                 }))
         return tasks
 
@@ -233,94 +294,67 @@ class FetchTask(Model):
         return {getattr(r, id_column) for r in rows}
 
     @classmethod
-    def _get_likes_settings(cls) -> dict:
-        """Read likes settings from ConfigEntry with defaults."""
-        settings = {
-            'stale_days': 2,
-            'initial_max_days': 90,
-            'refetch_max_days': 7,
-            'fetch_comments': False,
-        }
-        stale = ConfigEntry.getByKey('likes_stale_days')
-        if stale and stale.value:
-            try: settings['stale_days'] = int(stale.value)
-            except: pass
-        initial = ConfigEntry.getByKey('likes_initial_max_days')
-        if initial and initial.value:
-            try: settings['initial_max_days'] = int(initial.value)
-            except: pass
-        refetch = ConfigEntry.getByKey('likes_refetch_max_days')
-        if refetch and refetch.value:
-            try: settings['refetch_max_days'] = int(refetch.value)
-            except: pass
-        fetch_comments = ConfigEntry.getByKey('likes_fetch_comments')
-        if fetch_comments and fetch_comments.value == 'true':
-            settings['fetch_comments'] = True
-        return settings
-
-    @classmethod
     def _generate_likes_tasks(cls, slug: str) -> List["FetchTask"]:
-        """
-        Likes tasks für Posts mit upvotes > 0.
-        - Initial fetch (noch nie gefetched): Posts < initial_max_days (default 90)
-        - Re-fetch (stale): nur Posts < refetch_max_days (default 7)
-        - By default only toplevel posts, comments optional via settings
-        """
+        """Likes tasks for posts younger than likes_max_post_age_days with upvotes > 0."""
         tasks = []
         now = time.time()
-        settings = cls._get_likes_settings()
 
-        cutoff_initial = now - (settings['initial_max_days'] * 86400)
-        cutoff_refetch = now - (settings['refetch_max_days'] * 86400)
-        stale_threshold = int(now) - (settings['stale_days'] * 86400)
+        # Get likes-specific cutoff (default 30 days)
+        entry = ConfigEntry.getByKey('likes_max_post_age_days')
+        max_days = 30
+        if entry and entry.value:
+            try:
+                max_days = int(entry.value)
+            except:
+                pass
 
-        # Use custom stale threshold for likes
-        rows = Fetch.get_list(
-            "SELECT post_skool_id FROM fetch WHERE type = ? AND community_slug = ? AND status = 'ok' AND created_at > ?",
-            ['likes', slug, stale_threshold]
-        )
-        valid_ids = {r.post_skool_id for r in rows}
-        ever_fetched_ids = cls._get_ever_fetched_ids('likes', slug, 'post_skool_id')
+        # If 0, skip all likes fetching
+        if max_days <= 0:
+            return tasks
+
+        # Check if comments should be fetched too
+        fetch_comments = ConfigEntry.getByKey('likes_fetch_comments')
+        include_comments = fetch_comments and fetch_comments.value == 'true'
+
+        cutoff = now - (max_days * 86400)
+        valid_ids = cls._get_valid_fetch_ids('likes', slug, 'post_skool_id')
 
         # Build SQL based on whether comments should be fetched
-        if settings['fetch_comments']:
+        if include_comments:
             sql = "SELECT * FROM post WHERE community_slug = ? AND COALESCE(upvotes, 0) > 0"
         else:
             sql = "SELECT * FROM post WHERE community_slug = ? AND COALESCE(is_toplevel, 0) = 1 AND COALESCE(upvotes, 0) > 0"
         posts = Post.get_list(sql, [slug])
 
+        from datetime import datetime
         for p in posts:
-            # Skip wenn bereits gültiger Fetch existiert
+            # Skip if no date
+            if not p.skool_created_at:
+                continue
+
+            # Parse date, skip on failure
+            try:
+                created_ts = datetime.fromisoformat(p.skool_created_at.replace('Z', '+00:00')).timestamp()
+            except:
+                continue
+
+            # Skip if post too old
+            if created_ts < cutoff:
+                continue
+
+            # Skip if already fetched recently
             if p.skool_id in valid_ids:
                 continue
 
-            # Cutoff abhängig davon ob schon mal gefetched
-            was_fetched_before = p.skool_id in ever_fetched_ids
-            cutoff = cutoff_refetch if was_fetched_before else cutoff_initial
-
-            # Skip wenn Post zu alt für den jeweiligen Cutoff
-            if p.skool_created_at:
-                try:
-                    from datetime import datetime
-                    created_ts = datetime.fromisoformat(p.skool_created_at.replace('Z', '+00:00')).timestamp()
-                    if created_ts < cutoff:
-                        continue
-                except:
-                    pass
-
             is_comment = not getattr(p, 'is_toplevel', False)
             post_type = "comment" if is_comment else "post"
-            if was_fetched_before:
-                comment = f"Re-fetch likes for {post_type} '{p.name}' ({p.upvotes} likes, <{settings['refetch_max_days']}d old)"
-            else:
-                comment = f"Initial likes fetch for {post_type} '{p.name}' ({p.upvotes} likes, <{settings['initial_max_days']}d old)"
             tasks.append(cls({
                 "type": "likes",
                 "communitySlug": slug,
                 "postSkoolHexId": p.skool_id,
                 "postName": p.name,
-                "groupSkoolId": p.group_id,  # Skool UUID for api2.skool.com
-                "comment": comment,
+                "groupSkoolId": p.group_id,
+                "comment": f"Likes for {post_type} '{p.name}' ({p.upvotes} likes, <{max_days}d old)",
             }))
         return tasks
 

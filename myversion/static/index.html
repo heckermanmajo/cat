@@ -28,13 +28,37 @@
             <article style="margin-left: 20%; margin-right: 20%; text-align: center;">
                 <h1>CAT KNOWS</h1>
                 <input placeholder="Access Key">
-                <button>
-                    <a href="/members.html"> Apply Key </a>
+                <br><br>
+                <input id="communitySlugInput" placeholder="Community Slug (z.B. skool/community)">
+                <br>
+                <small style="margin-top: 5px;margin-bottom: 5px;">Der Slug ist der Teil nach skool.com/ in der URL deiner Community</small>
+                <br><br>
+                <button onclick="startApp()">
+                    Start
                 </button>
                 <br>
                 <small style="margin-top: 5px;margin-bottom: 5px;">We sent you an access key in your Skool-Mesages ... </small>
                 <br>
             </article>
         </main>
+        <script>
+            async function startApp() {
+                const slug = document.getElementById('communitySlugInput').value.trim();
+                if (!slug) {
+                    alert('Bitte gib einen Community Slug ein');
+                    return;
+                }
+                // Community in Config speichern
+                await ConfigEntry.set('current_community', slug);
+                // Zur communities-Liste hinzufügen falls noch nicht vorhanden
+                let communities = await ConfigEntry.get('communities');
+                communities = communities ? JSON.parse(communities) : [];
+                if (!communities.includes(slug)) {
+                    communities.push(slug);
+                    await ConfigEntry.set('communities', JSON.stringify(communities));
+                }
+                window.location.href = '/members.html';
+            }
+        </script>
     </body>
 </html>

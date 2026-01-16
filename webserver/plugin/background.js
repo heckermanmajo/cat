@@ -4,17 +4,37 @@ const API_URL = "http://localhost:3000";
 // State
 let tasks = [];
 let results = [];
+let logEntries = [];
 let isRunning = false;
 let isPaused = false;
 let shouldStop = false;
 let currentTaskIndex = 0;
 let lastTaskResult = null;
 
+function addLog(type, info, error, isInfo = false, message = null) {
+    logEntries.push({
+        time: new Date().toLocaleTimeString(),
+        type: type,
+        info: info,
+        error: error || null,
+        isInfo: isInfo,
+        message: message
+    });
+}
+
+function getTaskSummary(taskList) {
+    const counts = {};
+    for (const t of taskList) {
+        counts[t.type] = (counts[t.type] || 0) + 1;
+    }
+    return Object.entries(counts).map(([k, v]) => v + ' ' + k).join(', ');
+}
+
 // ============================================================================
 // API
 // ============================================================================
 
-async function loadTasks() {
+async function loadTasks(resetLog = true) {
     console.log('[bg] loadTasks() aufgerufen');
     console.log('[bg] Fetch:', `${API_URL}/api/fetch-tasks`);
     const res = await fetch(`${API_URL}/api/fetch-tasks`);
@@ -22,7 +42,10 @@ async function loadTasks() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     tasks = await res.json();
     console.log('[bg] Tasks geladen:', tasks);
-    results = [];
+    if (resetLog) {
+        results = [];
+        logEntries = [];
+    }
     return tasks;
 }
 
@@ -76,6 +99,9 @@ async function executeTask(tabId, task) {
             } else if (task.type === "leaderboard") {
                 // Leaderboard page
                 url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + ".json?tab=leaderboard&p=" + task.pageParam + "&group=" + task.communitySlug;
+            } else if (task.type === "community_about") {
+                // Community about page
+                url = "https://www.skool.com/_next/data/" + buildId + "/" + task.communitySlug + "/about.json?group=" + task.communitySlug;
             } else {
                 return { error: "Unknown task type: " + task.type };
             }
@@ -108,6 +134,7 @@ async function runAllTasks(resume = false) {
 
     if (!resume) {
         results = [];
+        logEntries = [];
         currentTaskIndex = 0;
         console.log('[bg] Fresh start, results cleared');
     } else {
@@ -126,6 +153,7 @@ async function runAllTasks(resume = false) {
 
     // Execute tasks - reload task list after each fetch
     console.log('[bg] Starting task loop, tasks.length:', tasks.length);
+    addLog(null, null, null, true, 'Starting: ' + tasks.length + ' tasks (' + getTaskSummary(tasks) + ')');
     while (tasks.length > 0) {
         // Check for stop signal
         if (shouldStop) {
@@ -152,6 +180,13 @@ async function runAllTasks(resume = false) {
         lastTaskResult = { task, result };
         results.push(lastTaskResult);
 
+        // Log the result
+        let info = task.communitySlug;
+        if (task.type === 'profile') info += ' @' + task.userName;
+        else if (task.type === 'comments' || task.type === 'likes') info += ' ' + (task.postName || task.postSkoolHexId);
+        else info += ' p' + task.pageParam;
+        addLog(task.type, info, result.error);
+
         // Send result immediately
         console.log('[bg] Sending result to server...');
         try {
@@ -161,10 +196,13 @@ async function runAllTasks(resume = false) {
             console.error('[bg] Failed to send result:', e);
         }
 
-        // Reload tasks (server may have generated new ones)
+        // Reload tasks (server may have generated new ones) - don't reset log
         console.log('[bg] Reloading tasks from server...');
-        await loadTasks();
+        await loadTasks(false);
         console.log('[bg] Tasks remaining:', tasks.length);
+        if (tasks.length > 0) {
+            addLog(null, null, null, true, 'Remaining: ' + tasks.length + ' (' + getTaskSummary(tasks) + ')');
+        }
 
         // Delay between requests (5s to avoid rate limiting)
         if (tasks.length > 0) {
@@ -229,8 +267,8 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.type === "GET_STATE") {
-        const state = { tasks, results, isRunning, isPaused, currentTaskIndex, totalTasks: tasks.length };
-        console.log('[bg] GET_STATE:', 'running:', isRunning, 'paused:', isPaused, 'tasks:', tasks.length);
+        const state = { tasks, results, logEntries, isRunning, isPaused, currentTaskIndex, totalTasks: tasks.length };
+        console.log('[bg] GET_STATE:', 'running:', isRunning, 'paused:', isPaused, 'tasks:', tasks.length, 'log:', logEntries.length);
         sendResponse(state);
         return true;
     }

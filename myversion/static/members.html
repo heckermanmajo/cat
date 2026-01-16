@@ -13,67 +13,99 @@
         <script>
 
             // =========================================================================
-            // Graph Rendering (Vis.js)
+            // Graph Rendering (Vis.js) - Interaktionen zwischen Usern
             // =========================================================================
             /**
-             * Rendert einen Member-Netzwerk-Graph.
-             * @param {HTMLElement} container - DOM Element für den Graph
-             * @param {Array} nodes - [{id, name, role, posts}, ...]
-             * @param {Array} edges - [{from, to, weight}, ...]
+             * Lädt und rendert den Interaktions-Graph.
+             * Knoten = User mit Profilbild
+             * Kanten = Likes (rot) + Comments (blau) zum Post-Autor
+             * @param {HTMLElement} container - Container für den Graph
+             * @param {Array} filteredMembers - Gefilterte Members (skool_ids werden verwendet)
              */
-            function renderMemberGraph(container, nodes, edges) {
+            async function loadAndRenderInteractionGraph(container, filteredMembers) {
+                container.innerHTML = '<p style="padding:20px">Lade Graph-Daten...</p>';
+
+                // POST mit skool_ids der gefilterten Members
+                const skoolIds = filteredMembers.map(m => m.skool_id);
+                const res = await post('/api/graph/interactions', {
+                    skool_ids: skoolIds,
+                    community: currentCommunity
+                });
+                if (!res.ok) {
+                    container.innerHTML = '<p style="padding:20px;color:red">Fehler beim Laden der Graph-Daten</p>';
+                    return;
+                }
+
+                const { nodes, like_edges, comment_edges } = res.data;
+
+                if (nodes.length === 0) {
+                    container.innerHTML = '<p style="padding:20px">Keine User gefunden</p>';
+                    return;
+                }
+
+                // Knoten mit Profilbildern
                 const visNodes = nodes.map(n => ({
                     id: n.id,
                     label: n.name,
-                    title: `${n.name}\nRole: ${n.role}\nPosts: ${n.posts}`,
-                    value: n.posts || 1,
-                    group: n.role
+                    shape: n.picture ? 'circularImage' : 'dot',
+                    image: n.picture || undefined,
+                    size: 25,
+                    title: `@${n.name}\nRole: ${n.role}`,
+                    group: n.role,
+                    borderWidth: 2
                 }));
-                const visEdges = edges.map(e => ({
-                    from: e.from,
-                    to: e.to,
-                    value: e.weight || 1
-                }));
-                const data = { nodes: visNodes, edges: visEdges };
-                const options = {
+
+                // Kanten: Likes (rot) + Comments (blau)
+                const visEdges = [
+                    ...like_edges.map(e => ({
+                        from: e.source,
+                        to: e.target,
+                        value: e.weight,
+                        color: { color: '#e74c3c', highlight: '#c0392b' },
+                        title: `${e.weight} Like${e.weight > 1 ? 's' : ''}`,
+                        arrows: 'to'
+                    })),
+                    ...comment_edges.map(e => ({
+                        from: e.source,
+                        to: e.target,
+                        value: e.weight,
+                        color: { color: '#3498db', highlight: '#2980b9' },
+                        title: `${e.weight} Comment${e.weight > 1 ? 's' : ''}`,
+                        arrows: 'to'
+                    }))
+                ];
+
+                // Stats anzeigen
+                const stats = `<small style="position:absolute;top:5px;left:10px;background:rgba(255,255,255,0.9);padding:4px 8px;border-radius:4px;z-index:10">
+                    ${nodes.length} Users | ${like_edges.length} Like-Verbindungen (rot) | ${comment_edges.length} Comment-Verbindungen (blau)
+                </small>`;
+                container.innerHTML = stats;
+
+                const graphDiv = document.createElement('div');
+                graphDiv.style.cssText = 'width:100%;height:100%';
+                container.appendChild(graphDiv);
+
+                // Vis.js Network
+                new vis.Network(graphDiv, { nodes: visNodes, edges: visEdges }, {
                     nodes: {
-                        shape: 'dot',
-                        scaling: { min: 10, max: 30 }
+                        font: { size: 12 },
+                        scaling: { min: 20, max: 40 }
                     },
                     edges: {
-                        smooth: false,
-                        scaling: { min: 1, max: 5 }
+                        smooth: { type: 'continuous' },
+                        scaling: { min: 1, max: 8 }
                     },
                     physics: {
-                        stabilization: { iterations: 100 }
+                        stabilization: { iterations: 50, fit: true },
+                        barnesHut: { gravitationalConstant: -2000, springLength: 120 }
                     },
                     groups: {
-                        admin: { color: '#e74c3c' },
-                        moderator: { color: '#f39c12' },
-                        member: { color: '#3498db' }
+                        admin: { color: { border: '#e74c3c', background: '#fadbd8' } },
+                        moderator: { color: { border: '#f39c12', background: '#fef5e7' } },
+                        member: { color: { border: '#3498db', background: '#ebf5fb' } }
                     }
-                };
-                new vis.Network(container, data, options);
+                });
             }
-
-            // Dummy-Daten für Test
-            const dummyNodes = [
-                {id: "1", name: "Max Admin", role: "admin", posts: 50},
-                {id: "2", name: "Anna Mod", role: "moderator", posts: 35},
-                {id: "3", name: "Tom Member", role: "member", posts: 20},
-                {id: "4", name: "Lisa Member", role: "member", posts: 15},
-                {id: "5", name: "Ben Member", role: "member", posts: 8},
-                {id: "6", name: "Sara Member", role: "member", posts: 5},
-            ];
-            const dummyEdges = [
-                {from: "1", to: "2", weight: 10},
-                {from: "1", to: "3", weight: 5},
-                {from: "2", to: "3", weight: 8},
-                {from: "2", to: "4", weight: 3},
-                {from: "3", to: "5", weight: 4},
-                {from: "4", to: "6", weight: 2},
-                {from: "1", to: "5", weight: 6},
-            ];
 
             // filter
             const membersFilterExpandedKey = "members.filter_expanded";
@@ -187,9 +219,9 @@
                         }
                     }break;
                     case "graph": {
-                        membersView.innerHTML = `<div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc;"></div>`;
+                        membersView.innerHTML = `<div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc; position: relative;"></div>`;
                         const container = document.getElementById("graph-container");
-                        renderMemberGraph(container, dummyNodes, dummyEdges);
+                        loadAndRenderInteractionGraph(container, members);
                     } break;
                     default:
                         membersView.innerHTML= "UNKNOWN VIEW -> this is a bug";
@@ -359,7 +391,11 @@
                         })();
                     } break;
                     case "export": {
-                        secondaryView.innerText = "EXPORT";
+                        secondaryView.innerHTML = `
+                            <h3>Export (${members.length} Members)</h3>
+                            <p><small>Exportiert die aktuelle Selektion als CSV-Datei.</small></p>
+                            <button onclick="downloadMembersCsv()">Download CSV</button>
+                        `;
                     } break;
                     case "activity": {
                         (async()=>{
@@ -453,7 +489,11 @@
             //
 
             // onload
-            window.onload = async () => {
+            window.onload = () => {
+                console.log("HELLO");
+                document.body.addEventListener("click", ()=>{
+                    console.log("BODY CLICKED");
+                });
 
                 // load members
                 (async () => {
@@ -484,7 +524,7 @@
                 lib.setupThemeOnLoad().then();
 
                 // community list
-                {
+                (async () => {
                     currentCommunity = await getCurrentCommunity();
                     communityListData = await lib.loadAllCommunities();
                     const currentCommunitySelectorHeader = document.getElementById("currentCommunitySelectorHeader");
@@ -495,7 +535,7 @@
                         option.innerText = community;
                         currentCommunitySelectorHeader.appendChild(option);
                     }
-                }
+                })().then();
             }
 
             //
@@ -545,6 +585,9 @@
                                 break;
                             case 'points_max':
                                 label = `Points <= ${val}`;
+                                break;
+                            case 'is_former_member':
+                                label = `Former member`;
                                 break;
                             default:
                                 continue;
@@ -637,6 +680,12 @@
                                     <td><input type="number" min="0" value="${state.points_max||''}" placeholder="∞"
                                         onchange="setFilterCondition('${mode}','points_max', this.value || -1)"></td>
                                 </tr>
+                                <tr>
+                                    <td><label>Former Member:</label></td>
+                                    <td><input type="checkbox" ${state.is_former_member ? 'checked' : ''}
+                                        onchange="setFilterCondition('${mode}','is_former_member', this.checked ? 'true' : -1)">
+                                        <small>Left the community</small></td>
+                                </tr>
                             </table>
                             <br>
                             <button onclick="this.closest('dialog').close()">Close</button>
@@ -650,6 +699,28 @@
                     dialog.showModal();
                 }, 100);
             }
+
+            //
+            //
+            // region EXPORT
+            //
+            //
+
+            let downloadMembersCsv = async () => {
+                const res = await fetch('/api/user/export-csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(filterState)
+                });
+                if (!res.ok) { alert('Export failed'); return; }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'members.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+            };
 
             //
             //

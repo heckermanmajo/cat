@@ -4,10 +4,31 @@ const stopBtn = document.getElementById('stopBtn');
 const resumeBtn = document.getElementById('resumeBtn');
 const tasksDiv = document.getElementById('tasks');
 const statusDiv = document.getElementById('status');
+const logDiv = document.getElementById('log');
 let pollInterval = null;
+let lastLogCount = 0;
 
 function log(msg) {
     statusDiv.textContent = msg;
+}
+
+function addLogEntry(entry) {
+    const cls = entry.error ? 'log-entry log-err' : (entry.isInfo ? 'log-entry log-info' : 'log-entry log-ok');
+    const time = entry.time || new Date().toLocaleTimeString();
+    const text = entry.error ? 'ERR: ' + entry.error : (entry.message || 'OK');
+    const info = entry.type ? (entry.type + ' ' + (entry.info || '')) : '';
+    const line = info ? '[' + time + '] ' + info + ' - ' + text : '[' + time + '] ' + text;
+    logDiv.innerHTML += '<div class="' + cls + '">' + line + '</div>';
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+function renderLog(logEntries) {
+    if (!logEntries || logEntries.length === lastLogCount) return;
+    // Nur neue Einträge hinzufügen
+    for (let i = lastLogCount; i < logEntries.length; i++) {
+        addLogEntry(logEntries[i]);
+    }
+    lastLogCount = logEntries.length;
 }
 
 function startPolling() {
@@ -25,6 +46,9 @@ function stopPolling() {
 function updateProgress() {
     browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
         console.log('[popup] State:', state);
+        if (state && state.logEntries) {
+            renderLog(state.logEntries);
+        }
         if (state && state.isRunning && state.totalTasks > 0) {
             log('Fetching ' + state.currentTaskIndex + ' / ' + state.totalTasks + '...');
             stopBtn.disabled = false;
@@ -72,6 +96,8 @@ function renderResults(results) {
 loadBtn.onclick = function() {
     log('Button geklickt!');
     loadBtn.disabled = true;
+    logDiv.innerHTML = '';
+    lastLogCount = 0;
 
     browser.runtime.sendMessage({ type: 'LOAD_TASKS' })
         .then(function(res) {
@@ -204,6 +230,11 @@ browser.runtime.sendMessage({ type: 'GET_STATE' }).then(function(state) {
     console.log('[popup] Initial state:', state);
     if (state && state.tasks && state.tasks.length) renderTasks(state.tasks);
     if (state && state.results && state.results.length) renderResults(state.results);
+    if (state && state.logEntries && state.logEntries.length) {
+        logDiv.innerHTML = '';
+        lastLogCount = 0;
+        renderLog(state.logEntries);
+    }
     runBtn.disabled = !(state && state.tasks && state.tasks.length);
 
     // If currently running, show progress and start polling

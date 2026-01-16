@@ -1,10 +1,10 @@
 @font-face { font-family: 'font'; src: url('/inter.ttf'); }
 html,body{color: whitesmoke; background-color: #1c1c1c; font-family: font;padding: 0; margin: 0;}
-body>header {background-color: #2d2d2d;padding: 10px;margin-bottom:10px}
+body>header {background-color: #2d2d2d;padding: 10px;margin-bottom:10px;}
 input::placeholder { color: darkgray; }
 select, input, button {color: lightgray; font-weight: bold;padding: 6px 12px; background-color: #2d2d2d; cursor: pointer; border-width: 1px; border-color: #374151;border-radius: 6px 6px;border-style: solid; }
 select:hover,button:hover, input:hover {background-color: #3f3d3d;}
-article, dialog {background-color: #2d2d2d; border-style: solid; border-width: 1px; border-color: #374151;border-radius: 4px 4px;padding-left: 6px; padding-right: 6px;} article{margin: 4px;}
+article, dialog {color: whitesmoke; background-color: #2d2d2d; border-style: solid; border-width: 1px; border-color: #374151;border-radius: 4px 4px;padding-left: 6px; padding-right: 6px;} article{margin: 4px;}
 a{text-decoration: none;}
 pre{overflow-wrap: break-word; !important; white-space: pre-wrap;white-space: -moz-pre-wrap;white-space: -pre-wrap;white-space: -o-pre-wrap;word-break: break-all !important;   }
 small{color: #777d86;display: inline-block;}

@@ -98,6 +98,32 @@ class MembersFilter:
                     else:
                         conditions.append("is_online = 1")
 
+            elif key == 'is_former_member':
+                if val is True or val == 'true':
+                    # Former member = NOT in latest fetch batch (same day as most recent fetch)
+                    # Uses community_slug from filter (passed as arg) for performance
+                    subquery = """
+                        skool_id NOT IN (
+                            SELECT DISTINCT u2.skool_id FROM user u2
+                            WHERE u2.fetch_id IN (
+                                SELECT f.id FROM fetch f
+                                WHERE f.type = 'members' AND f.community_slug = ?
+                                AND date(f.created_at, 'unixepoch') = (
+                                    SELECT date(f2.created_at, 'unixepoch') FROM fetch f2
+                                    WHERE f2.type = 'members' AND f2.community_slug = ?
+                                    ORDER BY f2.created_at DESC LIMIT 1
+                                )
+                            )
+                        )
+                    """
+                    if negate:
+                        conditions.append(subquery.replace("NOT IN", "IN"))
+                    else:
+                        conditions.append(subquery)
+                    # Need community_slug twice for the subquery
+                    args.append(self.community_slug)
+                    args.append(self.community_slug)
+
         return conditions, args
 
     def _get_order_by(self) -> str:
@@ -119,10 +145,12 @@ class MembersFilter:
         sql = "SELECT * FROM user WHERE 1=1"
         args = []
 
-        # Community filter (always applied)
+        # Community filter (required - no community = no results)
         if self.community_slug:
             sql += " AND community_slug = ?"
             args.append(self.community_slug)
+        else:
+            sql += " AND 1=0"  # No community set -> return empty
 
         # Search term
         if self.search_term:

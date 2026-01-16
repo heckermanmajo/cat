@@ -10,6 +10,46 @@
                lib.setupThemeOnLoad().then();
                currentView = (await ConfigEntry.get('data.currentView') ) || currentView;
                nav(currentView);
+               loadFetchSettings();
+            }
+
+            async function loadFetchSettings(){
+                const keys = [
+                    'comments_max_post_age_days',
+                    'likes_max_post_age_days', 'likes_fetch_comments',
+                    'min_shared_members',
+                    'stale_base', 'stale_profile', 'stale_comments',
+                    'max_post_age_days', 'max_user_inactive_days'
+                ];
+                for(const key of keys){
+                    const val = await ConfigEntry.get(key);
+                    const el = document.getElementById('set_' + key);
+                    if(!el) continue;
+                    if(el.type === 'checkbox'){
+                        el.checked = val === 'true';
+                    } else if(val){
+                        el.value = val;
+                    }
+                }
+            }
+
+            async function saveFetchSettings(){
+                const settings = {
+                    'comments_max_post_age_days': document.getElementById('set_comments_max_post_age_days').value,
+                    'likes_max_post_age_days': document.getElementById('set_likes_max_post_age_days').value,
+                    'likes_fetch_comments': document.getElementById('set_likes_fetch_comments').checked ? 'true' : 'false',
+                    'min_shared_members': document.getElementById('set_min_shared_members').value,
+                    'stale_base': document.getElementById('set_stale_base').value,
+                    'stale_profile': document.getElementById('set_stale_profile').value,
+                    'stale_comments': document.getElementById('set_stale_comments').value,
+                    'max_post_age_days': document.getElementById('set_max_post_age_days').value,
+                    'max_user_inactive_days': document.getElementById('set_max_user_inactive_days').value,
+                };
+                for(const [key, val] of Object.entries(settings)){
+                    await ConfigEntry.set(key, val);
+                }
+                document.getElementById('settings-status').textContent = 'Saved!';
+                setTimeout(() => document.getElementById('settings-status').textContent = '', 2000);
             }
             function nav(path){
                 ConfigEntry.set('data.currentView', path).then();
@@ -17,6 +57,13 @@
                 let el = document.getElementById(path)
                 el.style.display = 'block';
             }
+            async function resetFailedAbout(){
+                const res = await fetch('/api/reset-failed-about', {method: 'POST'});
+                const data = await res.json();
+                alert('Reset: ' + data.reset + ' communities\n' + (data.slugs || []).join(', '));
+                generateQueue();
+            }
+
             async function generateQueue(){
                 const res = await fetch('/api/fetch-tasks');
                 const tasks = await res.json();
@@ -229,8 +276,87 @@
         </header>
 
         <main id="fetchqueue" style="display: none">
-            <button onclick="generateQueue()">Generate QUEUE</button>
-            <div id='fetchqueue-target'></div>
+            <div style="display:flex; gap:20px;">
+                <div style="flex:1">
+                    <h3>Fetch Queue</h3>
+                    <button onclick="generateQueue()">Generate QUEUE</button>
+                    <button onclick="resetFailedAbout()">Reset Failed Tasks</button>
+                    <div id='fetchqueue-target'></div>
+                </div>
+                <div style="width:450px; padding:15px; border:1px solid #444; background:#1a1a1a;">
+                    <h3>Fetch Settings</h3>
+                    <p style="font-size:11px;color:#888">Reduce these values to generate fewer tasks</p>
+
+                    <fieldset style="margin-bottom:10px">
+                        <legend>Comments Fetching</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Max post age (days):</span>
+                            <input type="number" id="set_comments_max_post_age_days" style="width:80px" value="30">
+                            <small style="color:#888">(0 = disabled)</small>
+                        </label>
+                    </fieldset>
+
+                    <fieldset style="margin-bottom:10px">
+                        <legend>Likes Fetching</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Max post age (days):</span>
+                            <input type="number" id="set_likes_max_post_age_days" style="width:80px" value="30">
+                            <small style="color:#888">(0 = disabled)</small>
+                        </label>
+                        <label style="display:block;margin:5px 0">
+                            <input type="checkbox" id="set_likes_fetch_comments">
+                            <span>Also fetch likes for comments</span>
+                        </label>
+                    </fieldset>
+
+                    <fieldset style="margin-bottom:10px">
+                        <legend>Other Communities</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Min shared members:</span>
+                            <input type="number" id="set_min_shared_members" style="width:80px" value="10">
+                            <small style="color:#888">(default 10)</small>
+                        </label>
+                    </fieldset>
+
+                    <fieldset style="margin-bottom:10px">
+                        <legend>Stale Times (hours)</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Members/Posts/Leaderboard:</span>
+                            <input type="number" id="set_stale_base" style="width:80px" value="24">
+                            <small style="color:#888">(default 24)</small>
+                        </label>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Profiles:</span>
+                            <input type="number" id="set_stale_profile" style="width:80px" value="168">
+                            <small style="color:#888">(default 168 = 7d)</small>
+                        </label>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Comments:</span>
+                            <input type="number" id="set_stale_comments" style="width:80px" value="168">
+                            <small style="color:#888">(default 168 = 7d)</small>
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Cutoffs (days)</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Max post age:</span>
+                            <input type="number" id="set_max_post_age_days" style="width:80px" value="90">
+                            <small style="color:#888">(default 90)</small>
+                        </label>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Max user inactive:</span>
+                            <input type="number" id="set_max_user_inactive_days" style="width:80px" value="90">
+                            <small style="color:#888">(default 90)</small>
+                        </label>
+                    </fieldset>
+
+                    <div style="margin-top:15px">
+                        <button onclick="saveFetchSettings()">Save Settings</button>
+                        <span id="settings-status" style="margin-left:10px;color:#0f0"></span>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <main id="rawdata" style="display: none">

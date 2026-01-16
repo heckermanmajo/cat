@@ -3,7 +3,7 @@
   "name": "CatKnows Fetcher",
   "version": "1.0",
   "description": "Fetches data from Skool communities",
-  "permissions": ["activeTab", "storage", "https://www.skool.com/*", "http://localhost:3000/*"],
+  "permissions": ["activeTab", "storage", "https://www.skool.com/*", "https://api2.skool.com/*", "http://localhost:3000/*"],
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "CatKnows Fetcher"

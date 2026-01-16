@@ -59,15 +59,35 @@ lib.showError = function(title, message) {
         lib.errorDialog.innerHTML = `
             <h3 id="errTitle" style="color:crimson"></h3>
             <pre id="errMsg" style="max-width:500px;max-height:300px;overflow:auto"></pre>
-            <button onclick="this.closest('dialog').close()">OK</button>
+            <iframe id="errIframe" style="width:600px;height:400px;border:1px solid #333;display:none"></iframe>
+            <br><button onclick="this.closest('dialog').close()">OK</button>
         `;
         document.body.appendChild(lib.errorDialog);
     }
+    const msgStr = String(message);
+    const isHtml = msgStr.trim().startsWith('<!') || msgStr.trim().startsWith('<html');
+    const preEl = lib.errorDialog.querySelector('#errMsg');
+    const iframeEl = lib.errorDialog.querySelector('#errIframe');
+
     lib.errorDialog.querySelector('#errTitle').textContent = title;
-    lib.errorDialog.querySelector('#errMsg').textContent = String(message);
+    if (isHtml) {
+        preEl.style.display = 'none';
+        iframeEl.style.display = 'block';
+        iframeEl.srcdoc = msgStr;
+    } else {
+        preEl.style.display = 'block';
+        iframeEl.style.display = 'none';
+        preEl.textContent = msgStr;
+    }
     lib.errorDialog.showModal();
 };
 
-// Global error handlers
-window.onerror = (msg, src, line) => lib.showError('JS Error', `${msg}\n${src}:${line}`);
-window.onunhandledrejection = (e) => lib.showError('Promise Error', e.reason);
+// Global error handlers - immer auch in Konsole loggen
+window.onerror = (msg, src, line, col, error) => {
+    console.error('[JS ERROR]', msg, `\n  at ${src}:${line}:${col}`, error);
+    lib.showError('JS Error', `${msg}\n${src}:${line}`);
+};
+window.onunhandledrejection = (e) => {
+    console.error('[PROMISE ERROR]', e.reason);
+    lib.showError('Promise Error', e.reason);
+};
