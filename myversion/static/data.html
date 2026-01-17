@@ -252,23 +252,22 @@
             async function fetcherInit() {
                 if (typeof window.electronFetcher === 'undefined') {
                     fetcherUpdateStatus(false, false);
-                    fetcherLog('Electron nicht verfügbar - starte mit ./e.sh', 'warn');
+                    fetcherLog('Electron not available - start with ./e.sh', 'warn');
                     return;
                 }
                 fetcherUpdateStatus(true, false);
-                fetcherLog('Electron erkannt', 'ok');
+                fetcherLog('Electron detected', 'ok');
 
-                // Login-Status prüfen
                 const status = await window.electronFetcher.checkSkoolLogin();
                 fetcherUpdateStatus(true, status.loggedIn);
                 if (status.loggedIn) {
-                    fetcherLog('Bereits bei Skool eingeloggt', 'ok');
+                    fetcherLog('Already logged in to Skool', 'ok');
                 }
             }
 
             async function fetcherShowLogin() {
-                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
-                fetcherLog('Öffne Skool Login...');
+                if (!window.electronFetcher) { fetcherLog('Electron not available', 'error'); return; }
+                fetcherLog('Opening Skool Login...');
                 await window.electronFetcher.showSkoolLogin();
                 document.getElementById('btn-skool-hide').disabled = false;
                 document.getElementById('skool-close-overlay').style.display = 'flex';
@@ -277,33 +276,32 @@
             async function fetcherHideSkool() {
                 if (!window.electronFetcher) return;
                 await window.electronFetcher.hideSkool();
-                fetcherLog('Skool ausgeblendet');
+                fetcherLog('Skool hidden');
                 document.getElementById('btn-skool-hide').disabled = true;
                 document.getElementById('skool-close-overlay').style.display = 'none';
             }
 
             async function fetcherCheckLogin() {
-                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
-                fetcherLog('Prüfe Login-Status...');
+                if (!window.electronFetcher) { fetcherLog('Electron not available', 'error'); return; }
+                fetcherLog('Checking login status...');
                 const status = await window.electronFetcher.checkSkoolLogin();
                 fetcherUpdateStatus(true, status.loggedIn);
-                fetcherLog(status.loggedIn ? 'Eingeloggt!' : 'Nicht eingeloggt', status.loggedIn ? 'ok' : 'warn');
+                fetcherLog(status.loggedIn ? 'Logged in!' : 'Not logged in', status.loggedIn ? 'ok' : 'warn');
             }
 
             async function fetcherLoadTasks() {
-                fetcherLog('Lade Tasks vom Server...');
+                fetcherLog('Loading tasks from server...');
                 const res = await fetch('/api/fetch-tasks');
                 fetcherTasks = await res.json();
                 fetcherCurrentIndex = 0;
 
                 const tasksDiv = document.getElementById('fetcher-tasks');
                 if (!fetcherTasks.length) {
-                    tasksDiv.innerHTML = '<p style="color:#888">Keine Tasks vorhanden</p>';
-                    fetcherLog('Keine Tasks', 'warn');
+                    tasksDiv.innerHTML = '<p style="color:#888">No tasks available</p>';
+                    fetcherLog('No tasks', 'warn');
                     return;
                 }
 
-                // Tasks nach Typ zählen
                 const counts = {};
                 for (const t of fetcherTasks) { counts[t.type] = (counts[t.type] || 0) + 1; }
                 const summary = Object.entries(counts).map(([k,v]) => `${v}x ${k}`).join(', ');
@@ -321,22 +319,21 @@
                 html += '</div>';
                 tasksDiv.innerHTML = html;
 
-                fetcherLog(`${fetcherTasks.length} Tasks geladen (${summary})`, 'ok');
+                fetcherLog(`${fetcherTasks.length} tasks loaded (${summary})`, 'ok');
                 document.getElementById('btn-start').disabled = false;
             }
 
             async function fetcherStart() {
-                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
+                if (!window.electronFetcher) { fetcherLog('Electron not available', 'error'); return; }
 
-                // Login prüfen
                 const status = await window.electronFetcher.checkSkoolLogin();
                 if (!status.loggedIn) {
-                    fetcherLog('Bitte erst bei Skool einloggen!', 'error');
+                    fetcherLog('Please login to Skool first!', 'error');
                     return;
                 }
 
                 if (fetcherTasks.length === 0) {
-                    fetcherLog('Keine Tasks geladen', 'error');
+                    fetcherLog('No tasks loaded', 'error');
                     return;
                 }
 
@@ -355,15 +352,14 @@
                 document.getElementById('btn-stop').disabled = false;
                 document.getElementById('btn-load-tasks').disabled = true;
 
-                // Wartebildschirm anzeigen
                 lib.showLoading('fetching', {
                     showProgress: true,
-                    warning: 'Bitte diese Seite nicht verlassen!',
+                    warning: 'Please do not leave this page!',
                     onCancel: fetcherStop
                 });
                 lib.updateLoadingProgress(0, fetcherTasks.length);
 
-                fetcherLog('Starte Fetching...', 'ok');
+                fetcherLog('Starting fetch...', 'ok');
                 await fetcherRun();
             }
 
@@ -373,12 +369,12 @@
 
                 while (fetcherCurrentIndex < fetcherTasks.length) {
                     if (fetcherShouldStop) {
-                        fetcherLog('Gestoppt', 'warn');
+                        fetcherLog('Stopped', 'warn');
                         lib.hideLoading();
                         break;
                     }
                     if (fetcherPaused) {
-                        fetcherLog('Pausiert bei Task ' + (fetcherCurrentIndex + 1), 'warn');
+                        fetcherLog('Paused at task ' + (fetcherCurrentIndex + 1), 'warn');
                         lib.hideLoading();
                         return;
                     }
@@ -431,11 +427,10 @@
                     }
                 }
 
-                // Fertig
                 lib.hideLoading();
                 if (!fetcherShouldStop && !fetcherPaused) {
-                    fetcherLog(`Fertig! ${fetcherCurrentIndex} Tasks abgearbeitet`, 'ok');
-                    document.getElementById('fetcher-progress-text').textContent = 'Fertig!';
+                    fetcherLog(`Done! ${fetcherCurrentIndex} tasks completed`, 'ok');
+                    document.getElementById('fetcher-progress-text').textContent = 'Done!';
                 }
 
                 fetcherRunning = false;
@@ -447,7 +442,7 @@
 
             function fetcherPause() {
                 fetcherPaused = true;
-                document.getElementById('btn-start').textContent = 'Fortsetzen';
+                document.getElementById('btn-start').textContent = 'Resume';
                 document.getElementById('btn-start').disabled = false;
                 document.getElementById('btn-pause').disabled = true;
             }
@@ -468,12 +463,11 @@
             // Init beim Laden
             setTimeout(fetcherInit, 500);
 
-            // Event-Listener für Escape-Taste (vom Electron Main Process)
             if (window.electronFetcher && window.electronFetcher.onSkoolHidden) {
                 window.electronFetcher.onSkoolHidden(() => {
                     document.getElementById('skool-close-overlay').style.display = 'none';
                     document.getElementById('btn-skool-hide').disabled = true;
-                    fetcherLog('Skool geschlossen (Escape)', 'info');
+                    fetcherLog('Skool closed (Escape)', 'info');
                 });
             }
 
@@ -590,11 +584,10 @@
     </head>
     <body>
 
-        <!-- Close-Button für Skool Overlay (erscheint nur wenn Skool offen) -->
         <div id="skool-close-overlay" style="display:none; position:fixed; top:10px; left:50px; right:50px; height:60px; background:#1a1a1a; border:2px solid #f85149; border-radius:8px; z-index:9999; align-items:center; justify-content:space-between; padding:0 20px;">
-            <span style="color:#fff; font-size:16px;">Skool Login - Nach dem Einloggen schließen</span>
+            <span style="color:#fff; font-size:16px;">Skool Login - Close after logging in</span>
             <button onclick="fetcherHideSkool()" style="background:#f85149; color:#fff; border:none; padding:12px 24px; font-size:16px; cursor:pointer; border-radius:5px;">
-                SCHLIESSEN (oder ESC)
+                CLOSE (or ESC)
             </button>
         </div>
 

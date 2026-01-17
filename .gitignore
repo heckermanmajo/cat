@@ -4,6 +4,8 @@ venv/
 .idea/
 myversion/tmp/
 **/**.db
+**/**.sqlite
+*.sqlite
 **/catknows
 **/**.pyc
 
