@@ -236,16 +236,16 @@
                 const skStatus = document.getElementById('fetcher-skool-status');
 
                 if (electronOk) {
-                    elStatus.innerHTML = '<span style="color:#3fb950">Electron: Verbunden</span>';
+                    elStatus.innerHTML = '<span style="color:#3fb950">Electron: Connected</span>';
                 } else {
-                    elStatus.innerHTML = '<span style="color:#f85149">Electron: Nicht verfügbar - App im Browser starten über ./e.sh</span>';
+                    elStatus.innerHTML = '<span style="color:#f85149">Electron: Not available - Start app via ./e.sh</span>';
                 }
 
                 if (skoolLoggedIn) {
-                    skStatus.innerHTML = '<span style="color:#3fb950">Skool: Eingeloggt</span>';
+                    skStatus.innerHTML = '<span style="color:#3fb950">Skool: Logged in</span>';
                     document.getElementById('btn-skool-hide').disabled = false;
                 } else {
-                    skStatus.innerHTML = '<span style="color:#d29922">Skool: Nicht eingeloggt</span>';
+                    skStatus.innerHTML = '<span style="color:#d29922">Skool: Not logged in</span>';
                 }
             }
 
@@ -325,25 +325,6 @@
                 document.getElementById('btn-start').disabled = false;
             }
 
-            function showFetcherOverlay() {
-                document.getElementById('fetcher-wait-overlay').style.display = 'flex';
-            }
-
-            function hideFetcherOverlay() {
-                document.getElementById('fetcher-wait-overlay').style.display = 'none';
-            }
-
-            function updateFetcherOverlay(current, total) {
-                const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-                document.getElementById('fetcher-wait-progress').textContent = `Task ${current} / ${total}`;
-                document.getElementById('fetcher-wait-bar').value = percent;
-            }
-
-            function fetcherAbort() {
-                fetcherStop();
-                hideFetcherOverlay();
-            }
-
             async function fetcherStart() {
                 if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
 
@@ -375,8 +356,12 @@
                 document.getElementById('btn-load-tasks').disabled = true;
 
                 // Wartebildschirm anzeigen
-                showFetcherOverlay();
-                updateFetcherOverlay(0, fetcherTasks.length);
+                lib.showLoading('fetching', {
+                    showProgress: true,
+                    warning: 'Bitte diese Seite nicht verlassen!',
+                    onCancel: fetcherStop
+                });
+                lib.updateLoadingProgress(0, fetcherTasks.length);
 
                 fetcherLog('Starte Fetching...', 'ok');
                 await fetcherRun();
@@ -389,12 +374,12 @@
                 while (fetcherCurrentIndex < fetcherTasks.length) {
                     if (fetcherShouldStop) {
                         fetcherLog('Gestoppt', 'warn');
-                        hideFetcherOverlay();
+                        lib.hideLoading();
                         break;
                     }
                     if (fetcherPaused) {
                         fetcherLog('Pausiert bei Task ' + (fetcherCurrentIndex + 1), 'warn');
-                        hideFetcherOverlay();
+                        lib.hideLoading();
                         return;
                     }
 
@@ -409,7 +394,7 @@
                         `Task ${fetcherCurrentIndex + 1} / ${total} (${percent}%)`;
 
                     // Overlay Progress updaten
-                    updateFetcherOverlay(fetcherCurrentIndex + 1, total);
+                    lib.updateLoadingProgress(fetcherCurrentIndex + 1, total);
 
                     // Zur Community navigieren (für buildId)
                     fetcherLog(`[${fetcherCurrentIndex + 1}/${total}] ${task.type}: ${task.communitySlug}...`);
@@ -447,7 +432,7 @@
                 }
 
                 // Fertig
-                hideFetcherOverlay();
+                lib.hideLoading();
                 if (!fetcherShouldStop && !fetcherPaused) {
                     fetcherLog(`Fertig! ${fetcherCurrentIndex} Tasks abgearbeitet`, 'ok');
                     document.getElementById('fetcher-progress-text').textContent = 'Fertig!';
@@ -472,7 +457,7 @@
                 fetcherPaused = false;
                 fetcherRunning = false;
                 fetcherCurrentIndex = 0;
-                hideFetcherOverlay();
+                lib.hideLoading();
                 document.getElementById('btn-start').textContent = 'Start';
                 document.getElementById('btn-start').disabled = false;
                 document.getElementById('btn-pause').disabled = true;
@@ -613,22 +598,7 @@
             </button>
         </div>
 
-        <!-- Fetcher Wartebildschirm -->
-        <div id="fetcher-wait-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;">
-            <div style="text-align:center; padding:40px; background:#1a1a1a; border:2px solid var(--primary); border-radius:15px; max-width:500px;">
-                <img src="/img/logo.jpg" alt="CatKnows" style="width:150px; height:150px; border-radius:50%; margin-bottom:20px;">
-                <h2 style="color:#fff; margin-bottom:15px;">Fetching...</h2>
-                <div id="fetcher-wait-progress" style="color:#888; font-size:14px; margin-bottom:15px;">Task 0 / 0</div>
-                <progress id="fetcher-wait-bar" value="0" max="100" style="width:100%; height:15px; margin-bottom:20px;"></progress>
-                <p style="color:#f85149; font-size:16px; font-weight:bold; margin-bottom:25px;">
-                    Bitte diese Seite nicht verlassen!
-                </p>
-                <button onclick="fetcherAbort()" style="background:#f85149; color:#fff; border:none; padding:12px 30px; font-size:16px; cursor:pointer; border-radius:5px;">
-                    Abbrechen
-                </button>
-            </div>
-        </div>
-
+        
         <header style="height: 30px">
 
             <select id="viewSelection" onchange="window.location.href=this.value">

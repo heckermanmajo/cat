@@ -110,8 +110,10 @@ lib.loadingInterval = null;
 lib.catEmojis = ['🐱', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾', '🐈', '🐈‍⬛'];
 lib.loadingTexts = ['thinking', 'doodling', 'miauing', 'purring', 'napping', 'stretching', 'hunting', 'grooming', 'exploring', 'sneaking'];
 
-lib.showLoading = function(customText) {
+lib.showLoading = function(customText, options = {}) {
     if (lib.loadingOverlay) return;
+
+    const { onCancel, warning, showProgress } = options;
 
     lib.loadingOverlay = document.createElement('div');
     lib.loadingOverlay.id = 'catLoadingOverlay';
@@ -147,11 +149,31 @@ lib.showLoading = function(customText) {
                 40% { content: '..'; }
                 60%, 100% { content: '...'; }
             }
+            #catLoadingOverlay .loading-progress {
+                color: #888; font-size: 1rem; margin-top: 10px;
+            }
+            #catLoadingOverlay .loading-warning {
+                color: #f85149; font-size: 1rem; font-weight: bold; margin-top: 15px;
+            }
+            #catLoadingOverlay .loading-cancel {
+                margin-top: 20px; background: #f85149; color: #fff; border: none;
+                padding: 10px 25px; font-size: 1rem; cursor: pointer; border-radius: 5px;
+            }
+            #catLoadingOverlay progress {
+                width: 250px; height: 12px; margin-top: 10px;
+            }
         </style>
         <div class="cat-container" id="catContainer"></div>
         <div class="loading-text"><span id="loadingTextContent">thinking</span><span class="dots"></span></div>
+        ${showProgress ? '<div class="loading-progress" id="loadingProgress">0 / 0</div><progress id="loadingProgressBar" value="0" max="100"></progress>' : ''}
+        ${warning ? `<div class="loading-warning">${warning}</div>` : ''}
+        ${onCancel ? '<button class="loading-cancel" id="loadingCancelBtn">Abbrechen</button>' : ''}
     `;
     document.body.appendChild(lib.loadingOverlay);
+
+    if (onCancel) {
+        lib.loadingOverlay.querySelector('#loadingCancelBtn').onclick = onCancel;
+    }
 
     // Spawn cats
     const container = lib.loadingOverlay.querySelector('#catContainer');
@@ -176,6 +198,14 @@ lib.showLoading = function(customText) {
         };
         lib.textInterval = setInterval(changeText, 2000);
     }
+};
+
+lib.updateLoadingProgress = function(current, total) {
+    if (!lib.loadingOverlay) return;
+    const progressEl = lib.loadingOverlay.querySelector('#loadingProgress');
+    const barEl = lib.loadingOverlay.querySelector('#loadingProgressBar');
+    if (progressEl) progressEl.textContent = `${current} / ${total}`;
+    if (barEl) barEl.value = total > 0 ? Math.round((current / total) * 100) : 0;
 };
 
 lib.hideLoading = function() {

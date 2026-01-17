@@ -1,3 +1,8 @@
+ALLE USER FACING TEXTS IN ENGLISH!!!
+ALLE USER FACING TEXTS IN ENGLISH!!!
+ALLE USER FACING TEXTS IN ENGLISH!!!
+ALLE USER FACING TEXTS IN ENGLISH!!!
+
 
 Dies ist ein Analysetool für Skool communities.
 Es läuft nur lokal und wird mit nutika zu einer EXECUTABLE compilliert.
