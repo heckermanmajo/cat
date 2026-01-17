@@ -8,6 +8,7 @@ myversion/tmp/
 *.sqlite
 **/catknows
 **/**.pyc
+pyversion/logs.txt
 
 # Electron
 node_modules/

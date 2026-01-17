@@ -1,11 +1,12 @@
 import sqlite3
 import time
 import json
+import threading
 from typing import TypeVar, Type, Any, get_type_hints
 from flask import request, jsonify
 
 T = TypeVar('T')
-_conn: sqlite3.Connection = None
+_local = threading.local()
 _batch_mode: bool = False
 
 class Model:
@@ -36,11 +37,10 @@ class Model:
     # =========================================================================
     @staticmethod
     def connect(db_path: str = 'app.db') -> sqlite3.Connection:
-        global _conn
-        if _conn is None:
-            _conn = sqlite3.connect(db_path, check_same_thread=False)
-            _conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
-        return _conn
+        if not hasattr(_local, 'conn') or _local.conn is None:
+            _local.conn = sqlite3.connect(db_path)
+            _local.conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        return _local.conn
 
     @staticmethod
     def begin_batch():

@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           echo "=== Build output ==="
-          find electron-fetcher/dist -type f -name "*" | head -20
+          find electron-fetcher/dist -type f -name "*" 2>/dev/null | head -20 || true
 
       # ========================================
       # Step 4: Upload artifact
