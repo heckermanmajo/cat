@@ -180,3 +180,19 @@ def register(app):
             return jsonify({'error': 'No community selected'}), 400
         updated = extractor.apply_leaderboard_to_users(community.value)
         return jsonify({'updated': updated, 'community': community.value})
+
+    @app.route('/api/fetch/paginated')
+    def get_fetch_paginated():
+        """Fetches mit Pagination: ?page=1&limit=20"""
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        offset = (page - 1) * limit
+        total = Fetch.count()
+        fetches = Fetch.get_list("SELECT * FROM fetch ORDER BY id DESC LIMIT ? OFFSET ?", [limit, offset])
+        return jsonify({
+            'items': [f.to_dict() for f in fetches],
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'pages': (total + limit - 1) // limit
+        })

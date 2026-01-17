@@ -6,3 +6,8 @@ myversion/tmp/
 **/**.db
 **/catknows
 **/**.pyc
+
+# Electron
+node_modules/
+electron-fetcher/dist/
+electron-fetcher/package-lock.json

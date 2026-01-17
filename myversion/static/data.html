@@ -7,10 +7,12 @@
         <script>
             let currentView = "fetchqueue";
             window.onload = async () => {
+               lib.showLoading('waking up');
                lib.setupThemeOnLoad().then();
                currentView = (await ConfigEntry.get('data.currentView') ) || currentView;
                nav(currentView);
-               loadFetchSettings();
+               await loadFetchSettings();
+               lib.hideLoading();
             }
 
             async function loadFetchSettings(){
@@ -19,7 +21,8 @@
                     'likes_max_post_age_days', 'likes_fetch_comments',
                     'min_shared_members',
                     'stale_base', 'stale_profile', 'stale_comments',
-                    'max_post_age_days', 'max_user_inactive_days'
+                    'max_post_age_days', 'max_user_inactive_days',
+                    'error_404_max_failures', 'error_404_cooldown_hours'
                 ];
                 for(const key of keys){
                     const val = await ConfigEntry.get(key);
@@ -44,6 +47,8 @@
                     'stale_comments': document.getElementById('set_stale_comments').value,
                     'max_post_age_days': document.getElementById('set_max_post_age_days').value,
                     'max_user_inactive_days': document.getElementById('set_max_user_inactive_days').value,
+                    'error_404_max_failures': document.getElementById('set_error_404_max_failures').value,
+                    'error_404_cooldown_hours': document.getElementById('set_error_404_cooldown_hours').value,
                 };
                 for(const [key, val] of Object.entries(settings)){
                     await ConfigEntry.set(key, val);
@@ -65,8 +70,10 @@
             }
 
             async function generateQueue(){
+                lib.showLoading();
                 const res = await fetch('/api/fetch-tasks');
                 const tasks = await res.json();
+                lib.hideLoading();
                 const target = document.getElementById('fetchqueue-target');
                 if(!tasks.length){ target.innerHTML = '<p>Keine Tasks</p>'; return; }
                 // Count tasks by type
@@ -86,13 +93,19 @@
                 }
                 target.innerHTML = html + '</table>';
             }
-            async function loadRawData(){
-                const res = await fetch('/api/fetch');
+            let rawdataPage = 1;
+            const rawdataLimit = 100;
+
+            async function loadRawData(page = 1){
+                lib.showLoading();
+                rawdataPage = page;
+                const res = await fetch(`/api/fetch/paginated?page=${page}&limit=${rawdataLimit}`);
                 const data = await res.json();
+                lib.hideLoading();
                 const target = document.getElementById('rawdata-target');
-                if(!data.length){ target.innerHTML = '<p>Keine Fetches vorhanden</p>'; return; }
-                let html = '';
-                for (const f of data) {
+                if(!data.items.length){ target.innerHTML = '<p>Keine Fetches vorhanden</p>'; return; }
+                let html = renderPagination(data);
+                for (const f of data.items) {
                     const raw_data = JSON.stringify(JSON.parse(f.raw_data), null, 2);
                     html+= `<div style="border:1px solid #333; margin:5px; padding:10px;">
                         <b>#${f.id}</b> | ${f.type} | ${f.community_slug} | page ${f.page_param} | ${f.status} |
@@ -101,12 +114,33 @@
                         <details><summary>Raw Data</summary><pre style="max-height:200px;overflow:auto;font-size:11px">${raw_data}</pre></details>
                     </div>`;
                 }
+                html += renderPagination(data);
                 target.innerHTML = html;
             }
 
+            function renderPagination(data){
+                const {page, pages, total} = data;
+                if(pages <= 1) return '';
+                let html = `<div style="margin:10px 0;display:flex;gap:5px;align-items:center;">`;
+                html += `<span>Total: ${total} | Seite ${page}/${pages}</span>`;
+                html += `<button onclick="loadRawData(1)" ${page===1?'disabled':''}>«</button>`;
+                html += `<button onclick="loadRawData(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+                const start = Math.max(1, page - 2);
+                const end = Math.min(pages, page + 2);
+                for(let i = start; i <= end; i++){
+                    html += `<button onclick="loadRawData(${i})" ${i===page?'style="font-weight:bold"':''}>${i}</button>`;
+                }
+                html += `<button onclick="loadRawData(${page+1})" ${page===pages?'disabled':''}>›</button>`;
+                html += `<button onclick="loadRawData(${pages})" ${page===pages?'disabled':''}>»</button>`;
+                html += `</div>`;
+                return html;
+            }
+
             async function showOverview(){
+                lib.showLoading();
                 const res = await fetch('/api/database/overview');
                 const data = await res.json();
+                lib.hideLoading();
                 const target = document.getElementById('data-content');
                 if(!data.length){ target.innerHTML = '<p>Keine Tabellen vorhanden</p>'; return; }
                 let total = data.reduce((sum, t) => sum + t.count, 0);
@@ -118,6 +152,7 @@
             }
 
             async function showDataTab(tab){
+                lib.showLoading();
                 const target = document.getElementById('data-content');
                 if(tab === 'users'){
                     const res = await fetch('/api/user');
@@ -175,26 +210,347 @@
                     }
                     target.innerHTML = html + '</table>';
                 }
+                lib.hideLoading();
+            }
+
+            // ============================================================================
+            // ELECTRON FETCHER
+            // ============================================================================
+
+            let fetcherTasks = [];
+            let fetcherRunning = false;
+            let fetcherPaused = false;
+            let fetcherCurrentIndex = 0;
+            let fetcherShouldStop = false;
+
+            function fetcherLog(msg, type = 'info') {
+                const log = document.getElementById('fetcher-log');
+                const time = new Date().toLocaleTimeString();
+                const colors = { info: '#8b949e', ok: '#3fb950', error: '#f85149', warn: '#d29922' };
+                log.innerHTML += `<div style="color:${colors[type] || colors.info}">[${time}] ${msg}</div>`;
+                log.scrollTop = log.scrollHeight;
+            }
+
+            function fetcherUpdateStatus(electronOk, skoolLoggedIn) {
+                const elStatus = document.getElementById('fetcher-electron-status');
+                const skStatus = document.getElementById('fetcher-skool-status');
+
+                if (electronOk) {
+                    elStatus.innerHTML = '<span style="color:#3fb950">Electron: Verbunden</span>';
+                } else {
+                    elStatus.innerHTML = '<span style="color:#f85149">Electron: Nicht verfügbar - App im Browser starten über ./e.sh</span>';
+                }
+
+                if (skoolLoggedIn) {
+                    skStatus.innerHTML = '<span style="color:#3fb950">Skool: Eingeloggt</span>';
+                    document.getElementById('btn-skool-hide').disabled = false;
+                } else {
+                    skStatus.innerHTML = '<span style="color:#d29922">Skool: Nicht eingeloggt</span>';
+                }
+            }
+
+            async function fetcherInit() {
+                if (typeof window.electronFetcher === 'undefined') {
+                    fetcherUpdateStatus(false, false);
+                    fetcherLog('Electron nicht verfügbar - starte mit ./e.sh', 'warn');
+                    return;
+                }
+                fetcherUpdateStatus(true, false);
+                fetcherLog('Electron erkannt', 'ok');
+
+                // Login-Status prüfen
+                const status = await window.electronFetcher.checkSkoolLogin();
+                fetcherUpdateStatus(true, status.loggedIn);
+                if (status.loggedIn) {
+                    fetcherLog('Bereits bei Skool eingeloggt', 'ok');
+                }
+            }
+
+            async function fetcherShowLogin() {
+                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
+                fetcherLog('Öffne Skool Login...');
+                await window.electronFetcher.showSkoolLogin();
+                document.getElementById('btn-skool-hide').disabled = false;
+                document.getElementById('skool-close-overlay').style.display = 'flex';
+            }
+
+            async function fetcherHideSkool() {
+                if (!window.electronFetcher) return;
+                await window.electronFetcher.hideSkool();
+                fetcherLog('Skool ausgeblendet');
+                document.getElementById('btn-skool-hide').disabled = true;
+                document.getElementById('skool-close-overlay').style.display = 'none';
+            }
+
+            async function fetcherCheckLogin() {
+                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
+                fetcherLog('Prüfe Login-Status...');
+                const status = await window.electronFetcher.checkSkoolLogin();
+                fetcherUpdateStatus(true, status.loggedIn);
+                fetcherLog(status.loggedIn ? 'Eingeloggt!' : 'Nicht eingeloggt', status.loggedIn ? 'ok' : 'warn');
+            }
+
+            async function fetcherLoadTasks() {
+                fetcherLog('Lade Tasks vom Server...');
+                const res = await fetch('/api/fetch-tasks');
+                fetcherTasks = await res.json();
+                fetcherCurrentIndex = 0;
+
+                const tasksDiv = document.getElementById('fetcher-tasks');
+                if (!fetcherTasks.length) {
+                    tasksDiv.innerHTML = '<p style="color:#888">Keine Tasks vorhanden</p>';
+                    fetcherLog('Keine Tasks', 'warn');
+                    return;
+                }
+
+                // Tasks nach Typ zählen
+                const counts = {};
+                for (const t of fetcherTasks) { counts[t.type] = (counts[t.type] || 0) + 1; }
+                const summary = Object.entries(counts).map(([k,v]) => `${v}x ${k}`).join(', ');
+
+                let html = `<p><b>${fetcherTasks.length} Tasks:</b> ${summary}</p>`;
+                html += '<div style="font-size:11px; max-height:200px; overflow-y:auto;">';
+                for (let i = 0; i < fetcherTasks.length; i++) {
+                    const t = fetcherTasks[i];
+                    let info = t.communitySlug;
+                    if (t.type === 'profile') info += ' @' + t.userName;
+                    else if (t.type === 'comments' || t.type === 'likes') info += ' ' + (t.postName || t.postSkoolHexId);
+                    else if (t.pageParam) info += ' p' + t.pageParam;
+                    html += `<div id="task-${i}" style="padding:3px; border-bottom:1px solid #333;">${t.type}: ${info}</div>`;
+                }
+                html += '</div>';
+                tasksDiv.innerHTML = html;
+
+                fetcherLog(`${fetcherTasks.length} Tasks geladen (${summary})`, 'ok');
+                document.getElementById('btn-start').disabled = false;
+            }
+
+            function showFetcherOverlay() {
+                document.getElementById('fetcher-wait-overlay').style.display = 'flex';
+            }
+
+            function hideFetcherOverlay() {
+                document.getElementById('fetcher-wait-overlay').style.display = 'none';
+            }
+
+            function updateFetcherOverlay(current, total) {
+                const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+                document.getElementById('fetcher-wait-progress').textContent = `Task ${current} / ${total}`;
+                document.getElementById('fetcher-wait-bar').value = percent;
+            }
+
+            function fetcherAbort() {
+                fetcherStop();
+                hideFetcherOverlay();
+            }
+
+            async function fetcherStart() {
+                if (!window.electronFetcher) { fetcherLog('Electron nicht verfügbar', 'error'); return; }
+
+                // Login prüfen
+                const status = await window.electronFetcher.checkSkoolLogin();
+                if (!status.loggedIn) {
+                    fetcherLog('Bitte erst bei Skool einloggen!', 'error');
+                    return;
+                }
+
+                if (fetcherTasks.length === 0) {
+                    fetcherLog('Keine Tasks geladen', 'error');
+                    return;
+                }
+
+                // Delay validieren (minimum 5)
+                const delayInput = document.getElementById('fetcher-delay');
+                if (parseInt(delayInput.value) < 5) {
+                    delayInput.value = 5;
+                }
+
+                fetcherRunning = true;
+                fetcherPaused = false;
+                fetcherShouldStop = false;
+
+                document.getElementById('btn-start').disabled = true;
+                document.getElementById('btn-pause').disabled = false;
+                document.getElementById('btn-stop').disabled = false;
+                document.getElementById('btn-load-tasks').disabled = true;
+
+                // Wartebildschirm anzeigen
+                showFetcherOverlay();
+                updateFetcherOverlay(0, fetcherTasks.length);
+
+                fetcherLog('Starte Fetching...', 'ok');
+                await fetcherRun();
+            }
+
+            async function fetcherRun() {
+                const delay = parseInt(document.getElementById('fetcher-delay').value) * 1000;
+                const total = fetcherTasks.length;
+
+                while (fetcherCurrentIndex < fetcherTasks.length) {
+                    if (fetcherShouldStop) {
+                        fetcherLog('Gestoppt', 'warn');
+                        hideFetcherOverlay();
+                        break;
+                    }
+                    if (fetcherPaused) {
+                        fetcherLog('Pausiert bei Task ' + (fetcherCurrentIndex + 1), 'warn');
+                        hideFetcherOverlay();
+                        return;
+                    }
+
+                    const task = fetcherTasks[fetcherCurrentIndex];
+                    const taskEl = document.getElementById('task-' + fetcherCurrentIndex);
+                    if (taskEl) taskEl.style.background = '#1f3a1f';
+
+                    // Progress
+                    const percent = Math.round(((fetcherCurrentIndex + 1) / total) * 100);
+                    document.getElementById('fetcher-progress').value = percent;
+                    document.getElementById('fetcher-progress-text').textContent =
+                        `Task ${fetcherCurrentIndex + 1} / ${total} (${percent}%)`;
+
+                    // Overlay Progress updaten
+                    updateFetcherOverlay(fetcherCurrentIndex + 1, total);
+
+                    // Zur Community navigieren (für buildId)
+                    fetcherLog(`[${fetcherCurrentIndex + 1}/${total}] ${task.type}: ${task.communitySlug}...`);
+                    await window.electronFetcher.navigateSkool(`https://www.skool.com/${task.communitySlug}`);
+
+                    // Task ausführen
+                    const result = await window.electronFetcher.executeFetchTask(task);
+
+                    if (result.error) {
+                        fetcherLog(`ERROR: ${result.error}`, 'error');
+                        if (taskEl) taskEl.style.background = '#3a1f1f';
+                    } else {
+                        fetcherLog(`OK`, 'ok');
+                        if (taskEl) taskEl.style.background = '#1f3a1f';
+                    }
+
+                    // Ergebnis an Server senden
+                    const taskResult = { task, result };
+                    try {
+                        await fetch('/api/fetch-result', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ results: [taskResult] })
+                        });
+                    } catch (e) {
+                        fetcherLog(`Server-Error: ${e.message}`, 'error');
+                    }
+
+                    fetcherCurrentIndex++;
+
+                    // Delay
+                    if (fetcherCurrentIndex < fetcherTasks.length && !fetcherShouldStop && !fetcherPaused) {
+                        await new Promise(r => setTimeout(r, delay));
+                    }
+                }
+
+                // Fertig
+                hideFetcherOverlay();
+                if (!fetcherShouldStop && !fetcherPaused) {
+                    fetcherLog(`Fertig! ${fetcherCurrentIndex} Tasks abgearbeitet`, 'ok');
+                    document.getElementById('fetcher-progress-text').textContent = 'Fertig!';
+                }
+
+                fetcherRunning = false;
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-pause').disabled = true;
+                document.getElementById('btn-stop').disabled = true;
+                document.getElementById('btn-load-tasks').disabled = false;
+            }
+
+            function fetcherPause() {
+                fetcherPaused = true;
+                document.getElementById('btn-start').textContent = 'Fortsetzen';
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-pause').disabled = true;
+            }
+
+            function fetcherStop() {
+                fetcherShouldStop = true;
+                fetcherPaused = false;
+                fetcherRunning = false;
+                fetcherCurrentIndex = 0;
+                hideFetcherOverlay();
+                document.getElementById('btn-start').textContent = 'Start';
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-pause').disabled = true;
+                document.getElementById('btn-stop').disabled = true;
+                document.getElementById('btn-load-tasks').disabled = false;
+            }
+
+            // Init beim Laden
+            setTimeout(fetcherInit, 500);
+
+            // Event-Listener für Escape-Taste (vom Electron Main Process)
+            if (window.electronFetcher && window.electronFetcher.onSkoolHidden) {
+                window.electronFetcher.onSkoolHidden(() => {
+                    document.getElementById('skool-close-overlay').style.display = 'none';
+                    document.getElementById('btn-skool-hide').disabled = true;
+                    fetcherLog('Skool geschlossen (Escape)', 'info');
+                });
             }
 
             async function extractAll(){
                 // Dialog erstellen
                 const dialog = document.createElement('dialog');
+                dialog.style.cssText = 'min-width: 500px; min-height: 400px; padding: 40px;';
                 dialog.innerHTML = `
-                    <h3>Extraktion läuft...</h3>
-                    <p style="color:orange"><b>Fenster nicht schließen!</b></p>
-                    <div id="ext-progress-text">Starte...</div>
-                    <progress id="ext-progress-bar" value="0" max="100" style="width:300px"></progress>
-                    <div id="ext-stats" style="margin-top:10px;font-size:12px"></div>
+                    <style>
+                        .cat-container { position: relative; width: 400px; height: 180px; overflow: hidden; margin: 0 auto; }
+                        .floating-cat { position: absolute; font-size: 3rem; animation: floatUp 2.5s ease-out forwards; }
+                        @keyframes floatUp {
+                            0% { transform: translateY(150px) scale(0.5); opacity: 0; }
+                            20% { opacity: 1; }
+                            80% { opacity: 1; }
+                            100% { transform: translateY(-80px) scale(1.3); opacity: 0; }
+                        }
+                        .extract-text { text-align: center; font-size: 2rem; margin: 20px 0; }
+                        .dots::after { content: ''; animation: dots 1.5s infinite; }
+                        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+                    </style>
+                    <div class="cat-container" id="ext-cat-container"></div>
+                    <div class="extract-text"><span id="ext-cat-text">hunting</span><span class="dots"></span></div>
+                    <p style="color:orange;text-align:center;font-size:1.2rem;margin:20px 0"><b>Don't close this window!</b></p>
+                    <div id="ext-progress-text" style="text-align:center;font-size:1.3rem;margin:15px 0">Starting...</div>
+                    <progress id="ext-progress-bar" value="0" max="100" style="width:100%;height:25px"></progress>
+                    <div id="ext-stats" style="margin-top:20px;font-size:1.1rem;text-align:center"></div>
                 `;
                 document.body.appendChild(dialog);
                 dialog.showModal();
+
+                // Cat animation
+                const catEmojis = ['🐱', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾', '🐈', '🐈‍⬛'];
+                const catTexts = ['thinking', 'doodling', 'miauing', 'purring', 'extracting', 'hunting', 'grooming', 'exploring'];
+                const catContainer = dialog.querySelector('#ext-cat-container');
+                const catTextEl = dialog.querySelector('#ext-cat-text');
+                const spawnCat = () => {
+                    const cat = document.createElement('span');
+                    cat.className = 'floating-cat';
+                    cat.textContent = catEmojis[Math.floor(Math.random() * catEmojis.length)];
+                    cat.style.left = (Math.random() * 340 + 30) + 'px';
+                    catContainer.appendChild(cat);
+                    setTimeout(() => cat.remove(), 2500);
+                };
+                spawnCat();
+                const catInterval = setInterval(spawnCat, 300);
+                const textInterval = setInterval(() => {
+                    catTextEl.textContent = catTexts[Math.floor(Math.random() * catTexts.length)];
+                }, 2000);
 
                 // Info holen
                 const info = await fetch('/api/extract-info').then(r => r.json());
                 const total = info.total;
                 if(total === 0){
-                    dialog.innerHTML = `<h3>Keine Fetches vorhanden</h3><button onclick="this.closest('dialog').close()">OK</button>`;
+                    clearInterval(catInterval);
+                    clearInterval(textInterval);
+                    dialog.innerHTML = `
+                        <div style="text-align:center">
+                            <h2 style="font-size:2rem;margin-bottom:30px">😿 No fetches available</h2>
+                            <button onclick="this.closest('dialog').close()" style="padding:10px 30px;font-size:1.2rem">OK</button>
+                        </div>
+                    `;
                     return;
                 }
                 const batchSize = 50;
@@ -225,25 +581,53 @@
                     dialog.querySelector('#ext-stats').innerHTML = `Users: ${totals.users} | Posts: ${totals.posts} | Comments: ${totals.comments} | Profiles: ${totals.profiles}`;
                 }
 
-                // Fertig
+                // Fertig - Intervals stoppen
+                clearInterval(catInterval);
+                clearInterval(textInterval);
                 dialog.innerHTML = `
-                    <h3>Fertig!</h3>
-                    <p>Extrahiert:</p>
-                    <ul>
-                        <li>${totals.users} Users</li>
-                        <li>${totals.posts} Posts</li>
-                        <li>${totals.comments} Comments</li>
-                        <li>${totals.profiles} Profiles</li>
-                        <li>${totals.leaderboard} Leaderboard</li>
-                        <li>${totals.other_communities} Other Communities</li>
-                    </ul>
-                    <button onclick="this.closest('dialog').close()">OK</button>
+                    <div style="text-align:center">
+                        <h2 style="font-size:2.5rem;margin-bottom:20px">😺 Done!</h2>
+                        <p style="font-size:1.2rem;margin-bottom:20px">Extracted:</p>
+                        <ul style="list-style:none;padding:0;font-size:1.3rem;line-height:2">
+                            <li><b>${totals.users}</b> Users</li>
+                            <li><b>${totals.posts}</b> Posts</li>
+                            <li><b>${totals.comments}</b> Comments</li>
+                            <li><b>${totals.profiles}</b> Profiles</li>
+                            <li><b>${totals.leaderboard}</b> Leaderboard</li>
+                            <li><b>${totals.other_communities}</b> Other Communities</li>
+                        </ul>
+                        <button onclick="this.closest('dialog').close()" style="margin-top:20px;padding:10px 30px;font-size:1.2rem">OK</button>
+                    </div>
                 `;
             }
         </script>
         <title>Cat</title>
     </head>
     <body>
+
+        <!-- Close-Button für Skool Overlay (erscheint nur wenn Skool offen) -->
+        <div id="skool-close-overlay" style="display:none; position:fixed; top:10px; left:50px; right:50px; height:60px; background:#1a1a1a; border:2px solid #f85149; border-radius:8px; z-index:9999; align-items:center; justify-content:space-between; padding:0 20px;">
+            <span style="color:#fff; font-size:16px;">Skool Login - Nach dem Einloggen schließen</span>
+            <button onclick="fetcherHideSkool()" style="background:#f85149; color:#fff; border:none; padding:12px 24px; font-size:16px; cursor:pointer; border-radius:5px;">
+                SCHLIESSEN (oder ESC)
+            </button>
+        </div>
+
+        <!-- Fetcher Wartebildschirm -->
+        <div id="fetcher-wait-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;">
+            <div style="text-align:center; padding:40px; background:#1a1a1a; border:2px solid var(--primary); border-radius:15px; max-width:500px;">
+                <img src="/img/logo.jpg" alt="CatKnows" style="width:150px; height:150px; border-radius:50%; margin-bottom:20px;">
+                <h2 style="color:#fff; margin-bottom:15px;">Fetching...</h2>
+                <div id="fetcher-wait-progress" style="color:#888; font-size:14px; margin-bottom:15px;">Task 0 / 0</div>
+                <progress id="fetcher-wait-bar" value="0" max="100" style="width:100%; height:15px; margin-bottom:20px;"></progress>
+                <p style="color:#f85149; font-size:16px; font-weight:bold; margin-bottom:25px;">
+                    Bitte diese Seite nicht verlassen!
+                </p>
+                <button onclick="fetcherAbort()" style="background:#f85149; color:#fff; border:none; padding:12px 30px; font-size:16px; cursor:pointer; border-radius:5px;">
+                    Abbrechen
+                </button>
+            </div>
+        </div>
 
         <header style="height: 30px">
 
@@ -256,6 +640,7 @@
                 <option value="/data.html" selected> DATABASE </option>
             </select>
 
+            <button onclick="nav('fetcher')"> Fetcher </button>
             <button onclick="nav('fetchqueue')"> Fetch-Queue </button>
             <button onclick="nav('rawdata')"> Raw Data </button>
             <button onclick="nav('data')"> Data </button>
@@ -267,13 +652,74 @@
                     <option>Community name3</option>
                     <option>Community name4</option>
                 </select>
-                <select id="themeSelection" onchange="setTheme(this.value).then()">
+                <select id="themeSelection" onchange="lib.setTheme(this.value).then()">
                     <option value="blue"> Blue </option>
                     <option value="red"> Red </option>
+                    <option value="purple"> Purple </option>
+                    <option value="orange"> Orange </option>
+                    <option value="pink"> Pink </option>
+                    <option value="cyan"> Cyan </option>
+                    <option value="gold"> Gold </option>
                 </select>
             </nav>
 
         </header>
+
+        <main id="fetcher" style="display: none">
+            <div style="display:flex; gap:20px;">
+                <!-- Linke Spalte: Kontrolle -->
+                <div style="flex:1">
+                    <h3>Electron Fetcher</h3>
+
+                    <!-- Status-Anzeige -->
+                    <div id="fetcher-status" style="padding:15px; margin-bottom:15px; background:#1a1a1a; border:1px solid #444; border-radius:5px;">
+                        <div id="fetcher-electron-status">Prüfe Electron...</div>
+                        <div id="fetcher-skool-status" style="margin-top:10px">Skool: Nicht verbunden</div>
+                    </div>
+
+                    <!-- Skool Login Kontrolle -->
+                    <div style="margin-bottom:15px;">
+                        <button onclick="fetcherShowLogin()" id="btn-skool-login">Skool Login öffnen</button>
+                        <button onclick="fetcherHideSkool()" id="btn-skool-hide" disabled>Skool ausblenden</button>
+                        <button onclick="fetcherCheckLogin()" id="btn-skool-check">Status prüfen</button>
+                    </div>
+
+                    <!-- Fetch Kontrolle -->
+                    <div style="margin-bottom:15px; padding:15px; background:#1a1a1a; border:1px solid #444;">
+                        <h4 style="margin:0 0 10px 0">Fetch Kontrolle</h4>
+                        <button onclick="fetcherLoadTasks()" id="btn-load-tasks">Tasks laden</button>
+                        <button onclick="fetcherStart()" id="btn-start" disabled>Start</button>
+                        <button onclick="fetcherPause()" id="btn-pause" disabled>Pause</button>
+                        <button onclick="fetcherStop()" id="btn-stop" disabled>Stop</button>
+                        <div style="margin-top:10px">
+                            <label>
+                                Delay (Sekunden):
+                                <input type="number" id="fetcher-delay" value="5" min="5" max="30" style="width:60px">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div style="margin-bottom:15px;">
+                        <div id="fetcher-progress-text">Bereit</div>
+                        <progress id="fetcher-progress" value="0" max="100" style="width:100%;height:20px;margin-top:5px;"></progress>
+                    </div>
+
+                    <!-- Tasks Liste -->
+                    <div style="max-height:300px; overflow-y:auto; border:1px solid #444; padding:10px;" id="fetcher-tasks">
+                        <p style="color:#888">Keine Tasks geladen</p>
+                    </div>
+                </div>
+
+                <!-- Rechte Spalte: Log -->
+                <div style="width:400px;">
+                    <h3>Log</h3>
+                    <div id="fetcher-log" style="height:500px; overflow-y:auto; background:#0d1117; border:1px solid #444; padding:10px; font-family:monospace; font-size:12px;">
+                    </div>
+                    <button onclick="document.getElementById('fetcher-log').innerHTML=''" style="margin-top:5px">Log löschen</button>
+                </div>
+            </div>
+        </main>
 
         <main id="fetchqueue" style="display: none">
             <div style="display:flex; gap:20px;">
@@ -337,7 +783,7 @@
                         </label>
                     </fieldset>
 
-                    <fieldset>
+                    <fieldset style="margin-bottom:10px">
                         <legend>Cutoffs (days)</legend>
                         <label style="display:block;margin:5px 0">
                             <span style="display:inline-block;width:200px">Max post age:</span>
@@ -348,6 +794,20 @@
                             <span style="display:inline-block;width:200px">Max user inactive:</span>
                             <input type="number" id="set_max_user_inactive_days" style="width:80px" value="90">
                             <small style="color:#888">(default 90)</small>
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>404 Error Cooldown</legend>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Max failures before cooldown:</span>
+                            <input type="number" id="set_error_404_max_failures" style="width:80px" value="2">
+                            <small style="color:#888">(default 2)</small>
+                        </label>
+                        <label style="display:block;margin:5px 0">
+                            <span style="display:inline-block;width:200px">Cooldown (hours):</span>
+                            <input type="number" id="set_error_404_cooldown_hours" style="width:80px" value="12">
+                            <small style="color:#888">(default 12)</small>
                         </label>
                     </fieldset>
 

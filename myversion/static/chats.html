@@ -17,16 +17,22 @@
 
             <select id="viewSelection" onchange="window.location.href=this.value">
                 <option value="/members.html"> MEMBERS </option>
-                <option value="/posts.html" > POSTS </option>
+                <option value="/posts.html"> POSTS </option>
                 <option value="/communities.html"> COMMUNITIES </option>
                 <option value="/chats.html" selected> CHATS </option>
                 <option value="/prompts.html"> PROMPTS </option>
+                <option value="/data.html"> DATABASE </option>
             </select>
 
             <nav style="float: right">
-                <select id="themeSelection" onchange="setTheme(this.value).then()">
+                <select id="themeSelection" onchange="lib.setTheme(this.value).then()">
                     <option value="blue"> Blue </option>
                     <option value="red"> Red </option>
+                    <option value="purple"> Purple </option>
+                    <option value="orange"> Orange </option>
+                    <option value="pink"> Pink </option>
+                    <option value="cyan"> Cyan </option>
+                    <option value="gold"> Gold </option>
                 </select>
             </nav>
 
@@ -34,7 +40,8 @@
 
         <main>
             <article style="margin-left: 20%; margin-right: 20%; text-align: center;">
-                <h1>AI-CHATS - coming soon</h1>
+                <img src="/static/img/logo.jpg" alt="Logo" style="max-width: 200px; margin-bottom: 20px;">
+                <h1>🚧 AI-CHATS - coming soon 🏗️</h1>
             </article>
         </main>
     </body>

@@ -1,9 +1,20 @@
 lib = {}
+lib.primaryColorRGB = [32, 178, 170]; // default: lightseagreen
 lib.setTheme = async function (themeName){
     ConfigEntry.set('theme', themeName).then()
-    let color = "lightseagreen";
-    if (themeName === "green") color = "lightgreen";
-    if (themeName === "red") color = "crimson";
+    const themes = {
+        blue:   { color: "lightseagreen", rgb: [32, 178, 170] },
+        red:    { color: "crimson",       rgb: [220, 20, 60] },
+        green:  { color: "lightgreen",    rgb: [144, 238, 144] },
+        purple: { color: "#a855f7",       rgb: [168, 85, 247] },
+        orange: { color: "#f97316",       rgb: [249, 115, 22] },
+        pink:   { color: "#ec4899",       rgb: [236, 72, 153] },
+        cyan:   { color: "#06b6d4",       rgb: [6, 182, 212] },
+        gold:   { color: "#eab308",       rgb: [234, 179, 8] }
+    };
+    const theme = themes[themeName] || themes.blue;
+    let color = theme.color;
+    lib.primaryColorRGB = theme.rgb;
     let css = `
         button, a, select, b, h1, h2, h3, h4, h5, h6{ color: ${color} !important; }
         input[type="checkbox"]{ accent-color: ${color} !important;}
@@ -15,6 +26,7 @@ lib.setTheme = async function (themeName){
         document.head.appendChild(style);
     }
     style.innerHTML = css;
+    window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: themeName, rgb: theme.rgb } }));
 };
 lib.setupThemeOnLoad = async function (){
     let themeName = await ConfigEntry.get('theme');
@@ -90,4 +102,84 @@ window.onerror = (msg, src, line, col, error) => {
 window.onunhandledrejection = (e) => {
     console.error('[PROMISE ERROR]', e.reason);
     lib.showError('Promise Error', e.reason);
+};
+
+// Cat Loading Animation
+lib.loadingOverlay = null;
+lib.loadingInterval = null;
+lib.catEmojis = ['🐱', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾', '🐈', '🐈‍⬛'];
+lib.loadingTexts = ['thinking', 'doodling', 'miauing', 'purring', 'napping', 'stretching', 'hunting', 'grooming', 'exploring', 'sneaking'];
+
+lib.showLoading = function(customText) {
+    if (lib.loadingOverlay) return;
+
+    lib.loadingOverlay = document.createElement('div');
+    lib.loadingOverlay.id = 'catLoadingOverlay';
+    lib.loadingOverlay.innerHTML = `
+        <style>
+            #catLoadingOverlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); z-index: 9999;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+            }
+            #catLoadingOverlay .cat-container {
+                position: relative; width: 200px; height: 150px; overflow: hidden;
+            }
+            #catLoadingOverlay .floating-cat {
+                position: absolute; font-size: 2rem;
+                animation: floatUp 2s ease-out forwards;
+            }
+            @keyframes floatUp {
+                0% { transform: translateY(100px) scale(0.5); opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+            }
+            #catLoadingOverlay .loading-text {
+                font-size: 1.5rem; color: white; margin-top: 20px;
+                font-family: monospace;
+            }
+            #catLoadingOverlay .dots::after {
+                content: ''; animation: dots 1.5s infinite;
+            }
+            @keyframes dots {
+                0%, 20% { content: '.'; }
+                40% { content: '..'; }
+                60%, 100% { content: '...'; }
+            }
+        </style>
+        <div class="cat-container" id="catContainer"></div>
+        <div class="loading-text"><span id="loadingTextContent">thinking</span><span class="dots"></span></div>
+    `;
+    document.body.appendChild(lib.loadingOverlay);
+
+    // Spawn cats
+    const container = lib.loadingOverlay.querySelector('#catContainer');
+    const spawnCat = () => {
+        const cat = document.createElement('span');
+        cat.className = 'floating-cat';
+        cat.textContent = lib.catEmojis[Math.floor(Math.random() * lib.catEmojis.length)];
+        cat.style.left = (Math.random() * 160 + 20) + 'px';
+        container.appendChild(cat);
+        setTimeout(() => cat.remove(), 2000);
+    };
+    spawnCat();
+    lib.loadingInterval = setInterval(spawnCat, 400);
+
+    // Change text
+    const textEl = lib.loadingOverlay.querySelector('#loadingTextContent');
+    if (customText) {
+        textEl.textContent = customText;
+    } else {
+        const changeText = () => {
+            textEl.textContent = lib.loadingTexts[Math.floor(Math.random() * lib.loadingTexts.length)];
+        };
+        lib.textInterval = setInterval(changeText, 2000);
+    }
+};
+
+lib.hideLoading = function() {
+    if (lib.loadingInterval) { clearInterval(lib.loadingInterval); lib.loadingInterval = null; }
+    if (lib.textInterval) { clearInterval(lib.textInterval); lib.textInterval = null; }
+    if (lib.loadingOverlay) { lib.loadingOverlay.remove(); lib.loadingOverlay = null; }
 };

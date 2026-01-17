@@ -68,6 +68,30 @@ class FetchStaleInformation:
     def get_max_user_inactive_days(cls) -> int:
         return cls._get_setting('max_user_inactive_days')
 
+    @classmethod
+    def get_404_cooldown_hours(cls) -> int:
+        entry = ConfigEntry.getByKey('error_404_cooldown_hours')
+        if entry and entry.value:
+            try:
+                val = int(entry.value)
+                if val > 0:
+                    return val
+            except:
+                pass
+        return 12  # default 12 hours
+
+    @classmethod
+    def get_404_max_failures(cls) -> int:
+        entry = ConfigEntry.getByKey('error_404_max_failures')
+        if entry and entry.value:
+            try:
+                val = int(entry.value)
+                if val > 0:
+                    return val
+            except:
+                pass
+        return 2  # default 2 failures
+
 
 class FetchTask(Model):
     """
@@ -138,6 +162,37 @@ class FetchTask(Model):
         """Get total_pages from page=1 fetch."""
         f = FetchTask._get_valid_fetch(fetch_type, slug, page=1)
         return f.total_pages if f else 0
+
+    @staticmethod
+    def _should_skip_404_cooldown(fetch_type: str, slug: str,
+                                   user_id: str = None, post_id: str = None) -> bool:
+        """
+        Prüft ob Task wegen 404-Cooldown übersprungen werden soll.
+        Wenn >= max_failures Fetches mit 404 und letzter < cooldown_hours alt → True (skip).
+        """
+        max_failures = FetchStaleInformation.get_404_max_failures()
+        cooldown_hours = FetchStaleInformation.get_404_cooldown_hours()
+        cutoff = int(time.time()) - (cooldown_hours * 3600)
+
+        # Build SQL for counting 404 errors
+        sql = "SELECT COUNT(*) as cnt FROM fetch WHERE type = ? AND community_slug = ? AND error_message LIKE '%404%'"
+        args = [fetch_type, slug]
+
+        if user_id:
+            sql += " AND user_skool_id = ?"
+            args.append(user_id)
+        if post_id:
+            sql += " AND post_skool_id = ?"
+            args.append(post_id)
+
+        rows = Model.query(sql, args)
+        if not rows or rows[0]['cnt'] < max_failures:
+            return False
+
+        # Check if most recent 404 is within cooldown period
+        sql2 = sql.replace("COUNT(*) as cnt", "created_at") + " ORDER BY created_at DESC LIMIT 1"
+        rows2 = Model.query(sql2, args)
+        return rows2 and rows2[0]['created_at'] > cutoff
 
     # =========================================================================
     # Task Generierung
@@ -226,6 +281,9 @@ class FetchTask(Model):
                     pass
 
             if u.skool_id not in valid_ids:
+                # Skip if in 404 cooldown
+                if cls._should_skip_404_cooldown('profile', slug, user_id=u.skool_id):
+                    continue
                 tasks.append(cls({
                     "type": "profile",
                     "communitySlug": slug,
@@ -274,6 +332,9 @@ class FetchTask(Model):
                 continue  # Skip if date parsing fails
 
             if p.skool_id not in valid_ids:
+                # Skip if in 404 cooldown
+                if cls._should_skip_404_cooldown('comments', slug, post_id=p.skool_id):
+                    continue
                 tasks.append(cls({
                     "type": "comments",
                     "communitySlug": slug,
@@ -346,6 +407,10 @@ class FetchTask(Model):
             if p.skool_id in valid_ids:
                 continue
 
+            # Skip if in 404 cooldown
+            if cls._should_skip_404_cooldown('likes', slug, post_id=p.skool_id):
+                continue
+
             is_comment = not getattr(p, 'is_toplevel', False)
             post_type = "comment" if is_comment else "post"
             tasks.append(cls({
@@ -409,6 +474,9 @@ class FetchTask(Model):
                 [oc.slug, threshold]
             )
             if not recent_fetch:
+                # Skip if in 404 cooldown
+                if cls._should_skip_404_cooldown('community_about', oc.slug):
+                    continue
                 tasks.append(cls({
                     "type": "community_about",
                     "communitySlug": oc.slug,

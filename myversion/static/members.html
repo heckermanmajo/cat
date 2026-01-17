@@ -23,6 +23,7 @@
              * @param {Array} filteredMembers - Gefilterte Members (skool_ids werden verwendet)
              */
             async function loadAndRenderInteractionGraph(container, filteredMembers) {
+                lib.showLoading('graphing');
                 container.innerHTML = '<p style="padding:20px">Lade Graph-Daten...</p>';
 
                 // POST mit skool_ids der gefilterten Members
@@ -31,6 +32,7 @@
                     skool_ids: skoolIds,
                     community: currentCommunity
                 });
+                lib.hideLoading();
                 if (!res.ok) {
                     container.innerHTML = '<p style="padding:20px;color:red">Fehler beim Laden der Graph-Daten</p>';
                     return;
@@ -97,7 +99,7 @@
                     },
                     physics: {
                         stabilization: { iterations: 50, fit: true },
-                        barnesHut: { gravitationalConstant: -2000, springLength: 120 }
+                        barnesHut: { gravitationalConstant: -3000, springLength: 250 }
                     },
                     groups: {
                         admin: { color: { border: '#e74c3c', background: '#fadbd8' } },
@@ -152,15 +154,47 @@
 
             // load members
             let members = [];
+            let membersPage = 1;
+            const membersLimit = 400;
 
-            let loadMembers = async () => {
+            let loadMembers = async (skipAnimation = false) => {
+                if (!skipAnimation) lib.showLoading();
                 const res = await post('/api/user/filter', filterState);
+                if (!skipAnimation) lib.hideLoading();
                 if (res.ok) {
                     members = res.data;
+                    membersPage = 1;
                     document.getElementById("memberAmount").innerText = members.length.toString();
                     renderMembersView();
-                    renderSecondaryView();
+                    if (!initialLoading) renderSecondaryView();
                 }
+            };
+
+            let setMembersPage = (page) => {
+                membersPage = page;
+                renderMembersView();
+                document.getElementById("members-view").scrollIntoView({behavior: 'smooth'});
+            };
+
+            let renderMembersPagination = () => {
+                const total = members.length;
+                const pages = Math.ceil(total / membersLimit);
+                if (pages <= 1) return '';
+                const start = (membersPage - 1) * membersLimit + 1;
+                const end = Math.min(membersPage * membersLimit, total);
+                let html = `<div style="margin:10px 0;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">`;
+                html += `<span>${start}-${end} von ${total} | Seite ${membersPage}/${pages}</span>`;
+                html += `<button onclick="setMembersPage(1)" ${membersPage===1?'disabled':''}>«</button>`;
+                html += `<button onclick="setMembersPage(${membersPage-1})" ${membersPage===1?'disabled':''}>‹</button>`;
+                const pStart = Math.max(1, membersPage - 2);
+                const pEnd = Math.min(pages, membersPage + 2);
+                for (let i = pStart; i <= pEnd; i++) {
+                    html += `<button onclick="setMembersPage(${i})" ${i===membersPage?'style="font-weight:bold"':''}>${i}</button>`;
+                }
+                html += `<button onclick="setMembersPage(${membersPage+1})" ${membersPage===pages?'disabled':''}>›</button>`;
+                html += `<button onclick="setMembersPage(${pages})" ${membersPage===pages?'disabled':''}>»</button>`;
+                html += `</div>`;
+                return html;
             };
 
             const formatDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString() : '-';
@@ -197,6 +231,11 @@
                 const secondaryViewActions = document.getElementById("secondary-views");
                 if (currentView === 'graph') secondaryViewActions.style.display = 'none';
                 else secondaryViewActions.style.display = 'inline';
+
+                // Paginated slice
+                const offset = (membersPage - 1) * membersLimit;
+                const pageMembers = members.slice(offset, offset + membersLimit);
+
                 switch(currentView){
                     case "list": {
                         membersView.innerHTML = `
@@ -204,9 +243,10 @@
                             <div style="flex-grow: 1; max-width: 50%" id='secondary-view'></div>
                         `;
                         const membersList = document.getElementById("members-list");
-                        for (let member of members) {
+                        for (let member of pageMembers) {
                             membersList.insertAdjacentHTML("beforeend", renderMemberCard(member, false));
                         }
+                        membersList.insertAdjacentHTML("beforeend", renderMembersPagination());
                     }break;
                     case "card": {
                         membersView.innerHTML = `
@@ -214,9 +254,10 @@
                             <div style="flex-grow: 1; max-width: 50%" id='secondary-view'></div>
                         `;
                         const membersList = document.getElementById("members-list");
-                        for (let member of members) {
+                        for (let member of pageMembers) {
                             membersList.insertAdjacentHTML("beforeend", renderMemberCard(member, true));
                         }
+                        membersList.insertAdjacentHTML("beforeend", renderMembersPagination());
                     }break;
                     case "graph": {
                         membersView.innerHTML = `<div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc; position: relative;"></div>`;
@@ -238,6 +279,7 @@
             // render profile details
             let loadAndRenderProfileDetails = (memberId) => {
                 (async ()=>{
+                    lib.showLoading();
                     const secondaryView = document.getElementById("secondary-view");
                     secondaryView.innerHTML = `<h3>Loading...</h3>`;
                     const user = await User.get(memberId);
@@ -316,10 +358,11 @@
                         html += `<small>No liked posts found (likes not fetched yet)</small>`;
                     }
 
-                    html += `<h4>NOTES</h4><small>Coming soon...</small>`;
+                    html += `<h4>NOTES</h4><small>🚧 Coming soon... 🏗️</small>`;
                     html += `<details><summary>Raw JSON</summary><pre>${JSON.stringify(user, null, 2)}</pre></details>`;
 
                     secondaryView.innerHTML = html;
+                    lib.hideLoading();
                 })();
             };
 
@@ -338,6 +381,7 @@
                 switch(currentSecondaryView){
                     case "posts": {
                         (async()=>{
+                            lib.showLoading();
                             secondaryView.innerHTML = `<h3>Loading Posts...</h3>`;
                             // Get skool_ids of currently filtered members
                             const skoolIds = members.map(m => m.skool_id);
@@ -363,10 +407,12 @@
                                 `;
                             }
                             secondaryView.innerHTML = html;
+                            lib.hideLoading();
                         })();
                     } break;
                     case "communities": {
                         (async()=>{
+                            lib.showLoading();
                             secondaryView.innerHTML = `<h3>Loading Communities...</h3>`;
                             // Get skool_ids of currently filtered members
                             const skoolIds = members.map(m => m.skool_id);
@@ -388,6 +434,7 @@
                             }
                             if (!res.data.length) html += `<small>No other communities found for selected members.</small>`;
                             secondaryView.innerHTML = html;
+                            lib.hideLoading();
                         })();
                     } break;
                     case "export": {
@@ -399,6 +446,7 @@
                     } break;
                     case "activity": {
                         (async()=>{
+                            lib.showLoading();
                             secondaryView.innerHTML = `<h3>Loading Activity...</h3>`;
                             const skoolIds = members.map(m => m.skool_id);
 
@@ -421,7 +469,8 @@
                                         const val = matrix[d][h];
                                         const intensity = val / maxVal;
                                         const alpha = 0.1 + intensity * 0.9;
-                                        const bg = `rgba(147, 51, 234, ${alpha.toFixed(2)})`;
+                                        const [r, g, b] = lib.primaryColorRGB;
+                                        const bg = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
                                         html += `<div style="background:${bg}; height:10px; border-radius:1px" title="${weekdays[d]} ${h}:00 - ${val}"></div>`;
                                     }
                                 }
@@ -449,6 +498,7 @@
                             }
 
                             secondaryView.innerHTML = html;
+                            lib.hideLoading();
 
                             // Chart.js nach DOM-Update
                             if (communityRes.ok) {
@@ -472,6 +522,113 @@
                         break;
                 }
             };
+            // Async version for initial loading (no animation, awaitable)
+            let renderSecondaryViewAsync = async () => {
+                const secondaryView = document.getElementById('secondary-view');
+                if (!secondaryView) return;
+                switch(currentSecondaryView){
+                    case "posts": {
+                        secondaryView.innerHTML = `<h3>Loading Posts...</h3>`;
+                        const skoolIds = members.map(m => m.skool_id);
+                        const res = await post('/api/post/by-users', { skool_ids: skoolIds });
+                        const data = res.ok ? res.data : [];
+                        let html = `<h3>Posts (${data.length})</h3>`;
+                        for (const p of data) {
+                            const meta = p.metadata ? JSON.parse(p.metadata) : {};
+                            const title = meta.title || p.name || '(Untitled)';
+                            const content = meta.content || '';
+                            const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
+                            const createdAt = p.skool_created_at ? new Date(p.skool_created_at).toLocaleDateString() : '-';
+                            html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #3498db">
+                                <b>${title}</b><br>
+                                <small style="color: #666">${preview}</small><br>
+                                <small>by <b>${p.user_name || '-'}</b> | ${p.upvotes || 0} upvotes | ${p.comments || 0} comments | ${p.community_slug} | ${createdAt}</small>
+                            </article>`;
+                        }
+                        secondaryView.innerHTML = html;
+                    } break;
+                    case "communities": {
+                        secondaryView.innerHTML = `<h3>Loading Communities...</h3>`;
+                        const skoolIds = members.map(m => m.skool_id);
+                        const res = await post('/api/communities/by-users', { skool_ids: skoolIds });
+                        if (!res.ok) { secondaryView.innerHTML = `<h3>Error loading communities</h3>`; return; }
+                        let html = `<h3>Other Communities (${res.data.length})</h3>`;
+                        html += `<small>Other communities of ${members.length} selected members</small><br><br>`;
+                        for (const c of res.data) {
+                            const name = c.name || c.slug;
+                            const fetched = c.about_fetched ? '(details fetched)' : '';
+                            html += `<article style="margin: 4px 0; padding: 8px; border-left: 3px solid #27ae60; cursor: pointer"
+                                onclick="changeCurrentCommunity('${c.slug}')">
+                                <b>${name}</b> <small style="color: #888">${fetched}</small><br>
+                                <small><b>${c.selection_count}</b> of selection | ${c.shared_user_count} global | slug: ${c.slug}</small>
+                            </article>`;
+                        }
+                        if (!res.data.length) html += `<small>No other communities found for selected members.</small>`;
+                        secondaryView.innerHTML = html;
+                    } break;
+                    case "export": {
+                        secondaryView.innerHTML = `<h3>Export (${members.length} Members)</h3>
+                            <p><small>Exportiert die aktuelle Selektion als CSV-Datei.</small></p>
+                            <button onclick="downloadMembersCsv()">Download CSV</button>`;
+                    } break;
+                    case "activity": {
+                        secondaryView.innerHTML = `<h3>Loading Activity...</h3>`;
+                        const skoolIds = members.map(m => m.skool_id);
+                        const [communityRes, membersRes] = await Promise.all([
+                            get('/api/activity/community?days=90'),
+                            post('/api/activity/members', { skool_ids: skoolIds })
+                        ]);
+                        const renderHeatmap = (matrix, weekdays) => {
+                            const maxVal = Math.max(...matrix.flat(), 1);
+                            const hourLabels = ['12AM','','','3AM','','','6AM','','','9AM','','','12PM','','','3PM','','','6PM','','','9PM','','',''];
+                            let html = '<div style="display:grid; grid-template-columns: 40px repeat(7, 1fr); gap:1px; font-size:10px">';
+                            html += '<div></div>';
+                            for (const day of weekdays) html += `<div style="text-align:center">${day}</div>`;
+                            for (let h = 0; h < 24; h++) {
+                                html += `<div style="text-align:right; padding-right:3px">${hourLabels[h]}</div>`;
+                                for (let d = 0; d < 7; d++) {
+                                    const val = matrix[d][h];
+                                    const intensity = val / maxVal;
+                                    const alpha = 0.1 + intensity * 0.9;
+                                    const [r, g, b] = lib.primaryColorRGB;
+                                    const bg = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
+                                    html += `<div style="background:${bg}; height:10px; border-radius:1px" title="${weekdays[d]} ${h}:00 - ${val}"></div>`;
+                                }
+                            }
+                            html += '</div>';
+                            return html;
+                        };
+                        let html = `<h3>Activity (${members.length} members)</h3>`;
+                        if (membersRes.ok) {
+                            const md = membersRes.data;
+                            html += `<small>Wann sind Members aktiv? (Wochentag x Stunde)</small>`;
+                            html += renderHeatmap(md.activity_matrix, md.weekdays);
+                        }
+                        if (communityRes.ok) {
+                            const cd = communityRes.data;
+                            html += `<h4 style="margin-top:20px">Last 3 Months</h4>
+                                <canvas id="activity-chart" style="max-height: 200px"></canvas>
+                                <small>Total: ${cd.posts.reduce((a,b)=>a+b,0)} posts, ${cd.comments.reduce((a,b)=>a+b,0)} comments</small>`;
+                        }
+                        secondaryView.innerHTML = html;
+                        if (communityRes.ok) {
+                            const cd = communityRes.data;
+                            new Chart(document.getElementById('activity-chart').getContext('2d'), {
+                                type: 'line',
+                                data: {
+                                    labels: cd.days.map(d => d.slice(5)),
+                                    datasets: [
+                                        { label: 'Posts', data: cd.posts, borderColor: '#3498db', tension: 0.3, pointRadius: 0 },
+                                        { label: 'Comments', data: cd.comments, borderColor: '#e74c3c', tension: 0.3, pointRadius: 0 }
+                                    ]
+                                },
+                                options: { responsive: true, maintainAspectRatio: true }
+                            });
+                        }
+                    } break;
+                }
+            };
+
             let setCurrentSecondaryView = (view) => {
                 currentSecondaryView = view;
                 ConfigEntry.set(secondaryViewConfigKey, view).then();
@@ -489,8 +646,10 @@
             //
 
             // onload
+            let initialLoading = true;
             window.onload = () => {
                 console.log("HELLO");
+                lib.showLoading('waking up');
                 document.body.addEventListener("click", ()=>{
                     console.log("BODY CLICKED");
                 });
@@ -504,13 +663,15 @@
                     select.value = currentView;
                     select.onchange = () => setCurrentView(select.value);
 
-                    // load members with filter
-                    await loadMembers();
+                    // load members with filter (skip internal loading animation during initial load)
+                    await loadMembers(true);
 
                     // secondary view selector
                     await getCurrentSecondaryView();
-                    renderSecondaryView();
+                    await renderSecondaryViewAsync();
 
+                    initialLoading = false;
+                    lib.hideLoading();
                 })().then();
 
                 //filter
@@ -522,6 +683,11 @@
                 });
 
                 lib.setupThemeOnLoad().then();
+
+                // Re-render activity heatmap when theme changes
+                window.addEventListener('themeChanged', () => {
+                    if (currentSecondaryView === 'activity') renderSecondaryView();
+                });
 
                 // community list
                 (async () => {
@@ -772,6 +938,11 @@
                 <select id="themeSelection" onchange="lib.setTheme(this.value).then()">
                     <option value="blue"> Blue </option>
                     <option value="red"> Red </option>
+                    <option value="purple"> Purple </option>
+                    <option value="orange"> Orange </option>
+                    <option value="pink"> Pink </option>
+                    <option value="cyan"> Cyan </option>
+                    <option value="gold"> Gold </option>
                 </select>
             </nav>
 

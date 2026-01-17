@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Electron Fetcher Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font: 16px system-ui; padding: 20px; max-width: 600px; }
+    h1 { margin-bottom: 20px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; font-size: 14px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+    .status.ok { background: #e8f5e9; }
+    .status.error { background: #ffebee; }
+    #log { margin-top: 20px; padding: 15px; background: #263238; color: #aed581;
+           font-family: monospace; font-size: 13px; border-radius: 5px;
+           max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
+    .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    input { padding: 8px; margin: 5px; width: 200px; }
+  </style>
+</head>
+<body>
+  <h1>CatKnows Electron Fetcher Test</h1>
+
+  <div class="status" id="status">
+    Status: Prüfe Electron-Umgebung...
+  </div>
+
+  <div class="section">
+    <h3>1. Skool Login</h3>
+    <button id="btnShowLogin">Skool Login anzeigen</button>
+    <button id="btnHideSkool">Skool ausblenden</button>
+    <button id="btnCheckLogin">Login-Status prüfen</button>
+  </div>
+
+  <div class="section">
+    <h3>2. Test-Fetch</h3>
+    <input type="text" id="communitySlug" placeholder="community-slug" value="skool-community">
+    <br>
+    <button id="btnFetchMembers">Members fetchen (p1)</button>
+    <button id="btnFetchPosts">Posts fetchen (p1)</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+
+    function setStatus(msg, type = '') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + type;
+    }
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      logEl.textContent += `[${time}] ${msg}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Prüfen ob wir in Electron sind
+    if (typeof window.electronFetcher === 'undefined') {
+      setStatus('Nicht in Electron! Bitte mit "npm start" starten.', 'error');
+      log('ERROR: electronFetcher API nicht gefunden');
+      log('Starte mit: cd electron-fetcher && npm install && npm start');
+    } else {
+      setStatus('Electron erkannt - bereit!', 'ok');
+      log('electronFetcher API geladen');
+    }
+
+    // Event Handlers
+    document.getElementById('btnShowLogin').onclick = async () => {
+      log('Öffne Skool Login...');
+      const res = await window.electronFetcher.showSkoolLogin();
+      log('showSkoolLogin: ' + JSON.stringify(res));
+      setStatus('Skool Login-Fenster geöffnet - bitte einloggen!');
+    };
+
+    document.getElementById('btnHideSkool').onclick = async () => {
+      log('Verstecke Skool...');
+      const res = await window.electronFetcher.hideSkool();
+      log('hideSkool: ' + JSON.stringify(res));
+      setStatus('Skool ausgeblendet', 'ok');
+    };
+
+    document.getElementById('btnCheckLogin').onclick = async () => {
+      log('Prüfe Login-Status...');
+      const res = await window.electronFetcher.checkSkoolLogin();
+      log('checkSkoolLogin: ' + JSON.stringify(res));
+      if (res.loggedIn) {
+        setStatus('Eingeloggt bei Skool!', 'ok');
+      } else {
+        setStatus('Nicht eingeloggt - bitte erst anmelden', 'error');
+      }
+    };
+
+    document.getElementById('btnFetchMembers').onclick = async () => {
+      const slug = document.getElementById('communitySlug').value;
+      log(`Fetche Members von "${slug}"...`);
+      setStatus('Fetching...');
+
+      // Erst zur Community navigieren (für buildId)
+      log('Navigiere zu Community...');
+      await window.electronFetcher.navigateSkool(`https://www.skool.com/${slug}`);
+
+      const task = { type: 'members', communitySlug: slug, pageParam: 1 };
+      const res = await window.electronFetcher.executeFetchTask(task);
+
+      if (res.error) {
+        log('ERROR: ' + res.error);
+        setStatus('Fehler: ' + res.error, 'error');
+      } else {
+        const members = res.data?.pageProps?.group?.members || [];
+        log('OK! ' + members.length + ' Members gefunden');
+        log('Erste 3: ' + members.slice(0,3).map(m => m.name || m.displayName).join(', '));
+        setStatus('Erfolgreich! ' + members.length + ' Members', 'ok');
+      }
+    };
+
+    document.getElementById('btnFetchPosts').onclick = async () => {
+      const slug = document.getElementById('communitySlug').value;
+      log(`Fetche Posts von "${slug}"...`);
+      setStatus('Fetching...');
+
+      // Erst zur Community navigieren (für buildId)
+      log('Navigiere zu Community...');
+      await window.electronFetcher.navigateSkool(`https://www.skool.com/${slug}`);
+
+      const task = { type: 'posts', communitySlug: slug, pageParam: 1 };
+      const res = await window.electronFetcher.executeFetchTask(task);
+
+      if (res.error) {
+        log('ERROR: ' + res.error);
+        setStatus('Fehler: ' + res.error, 'error');
+      } else {
+        const posts = res.data?.pageProps?.posts || [];
+        log('OK! ' + posts.length + ' Posts gefunden');
+        setStatus('Erfolgreich! ' + posts.length + ' Posts', 'ok');
+      }
+    };
+  </script>
+</body>
+</html>
