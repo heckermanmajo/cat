@@ -14,25 +14,31 @@ on:
         default: false
         type: boolean
       version:
-        description: 'Release version (z.B. v1.0.0) - nur nötig wenn Release aktiviert'
+        description: 'Release version (e.g. v1.0.0) - only needed if Release is enabled'
         required: false
         type: string
 
 jobs:
   # ============================================================================
-  # Python App Build (Nuitka)
+  # Build combined app (Python + Electron) for each platform
   # ============================================================================
-  build-python:
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: catknows-linux
+            platform: linux
+            python_binary: catknows
+            electron_artifact: "*.AppImage"
           - os: windows-latest
-            artifact_name: catknows-windows
+            platform: windows
+            python_binary: catknows.exe
+            electron_artifact: "*.exe"
           - os: macos-latest
-            artifact_name: catknows-macos
+            platform: macos
+            python_binary: catknows
+            electron_artifact: "*.zip"
 
     runs-on: ${{ matrix.os }}
 
@@ -40,6 +46,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ========================================
+      # Step 1: Build Python App
+      # ========================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -47,68 +56,64 @@ jobs:
           cache: 'pip'
           cache-dependency-path: myversion/requirements.txt
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r myversion/requirements.txt
 
-      - name: Build with Nuitka
+      - name: Build Python with Nuitka
         working-directory: myversion
         run: python build.py
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: myversion/dist/
-          if-no-files-found: error
+      # ========================================
+      # Step 2: Copy Python into Electron
+      # ========================================
+      - name: Copy Python binary to Electron
+        shell: bash
+        run: |
+          mkdir -p electron-fetcher/python
+          cp myversion/dist/${{ matrix.python_binary }} electron-fetcher/python/
+          # Also copy static files that Python needs
+          cp -r myversion/static electron-fetcher/python/ 2>/dev/null || true
+          ls -la electron-fetcher/python/
 
-  # ============================================================================
-  # Electron Fetcher Build
-  # ============================================================================
-  build-electron:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: fetcher-linux
-            build_cmd: npm run build:linux
-          - os: windows-latest
-            artifact_name: fetcher-windows
-            build_cmd: npm run build:win
-          - os: macos-latest
-            artifact_name: fetcher-macos
-            build_cmd: npm run build:mac
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      # ========================================
+      # Step 3: Build Electron App
+      # ========================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Install Electron dependencies
         working-directory: electron-fetcher
         run: npm install
 
       - name: Build Electron App
         working-directory: electron-fetcher
-        run: ${{ matrix.build_cmd }}
+        run: npm run build
 
+      - name: List build output
+        shell: bash
+        run: |
+          echo "=== Build output ==="
+          find electron-fetcher/dist -type f -name "*" | head -20
+
+      # ========================================
+      # Step 4: Upload artifact
+      # ========================================
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: catknows-${{ matrix.platform }}
           path: electron-fetcher/dist/
           if-no-files-found: error
 
+  # ============================================================================
+  # Deploy to production server
+  # ============================================================================
   deploy:
-    needs: [build-python, build-electron]
+    needs: build
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.deploy == 'true' }}
 
@@ -124,40 +129,25 @@ jobs:
       - name: List artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          find artifacts -type f -name "*" | head -50
+          find artifacts -type f | head -30
 
       - name: Prepare deployment package
         run: |
-          # Downloads-Ordner erstellen
           mkdir -p webserver/downloads
 
-          # === Python App ===
-          # Linux: tar.gz
-          chmod +x artifacts/catknows-linux/catknows
-          tar -czvf webserver/downloads/catknows-linux.tar.gz -C artifacts/catknows-linux catknows
+          # Linux: AppImage
+          find artifacts/catknows-linux -name "*.AppImage" -exec cp {} webserver/downloads/CatKnows-linux.AppImage \; 2>/dev/null || echo "No Linux AppImage"
 
           # Windows: exe
-          cp artifacts/catknows-windows/catknows.exe webserver/downloads/catknows-win.exe
+          find artifacts/catknows-windows -name "*.exe" -exec cp {} webserver/downloads/CatKnows-win.exe \; 2>/dev/null || echo "No Windows exe"
 
           # macOS: zip
-          chmod +x artifacts/catknows-macos/catknows
-          zip -j webserver/downloads/catknows-mac.zip artifacts/catknows-macos/catknows
-
-          # === Electron Fetcher ===
-          # Linux: AppImage
-          cp artifacts/fetcher-linux/*.AppImage webserver/downloads/fetcher-linux.AppImage 2>/dev/null || echo "No AppImage found"
-
-          # Windows: Portable exe
-          cp artifacts/fetcher-windows/*.exe webserver/downloads/fetcher-win.exe 2>/dev/null || echo "No Windows exe found"
-
-          # macOS: zip
-          cp artifacts/fetcher-macos/*.zip webserver/downloads/fetcher-mac.zip 2>/dev/null || \
-          zip -j webserver/downloads/fetcher-mac.zip artifacts/fetcher-macos/*.app 2>/dev/null || echo "No macOS build found"
+          find artifacts/catknows-macos -name "*.zip" -exec cp {} webserver/downloads/CatKnows-mac.zip \; 2>/dev/null || echo "No macOS zip"
 
           echo "=== Downloads folder ==="
           ls -la webserver/downloads/
 
-          # ZIP erstellen (ohne .md und excalidraw)
+          # Create web.zip for deployment
           cd webserver
           zip -r ../web.zip ./* -x "*.md" "*excalidraw*"
           cd ..
@@ -170,20 +160,21 @@ jobs:
           SSH_USER: ssh-w016728f
           DEPLOY_PATH: /www/htdocs/w016728f/testing.cat-knows.com/
         run: |
-          # SSH-Key einrichten
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
 
-          # Upload und entpacken
           scp web.zip ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}
           ssh ${SSH_USER}@${SSH_HOST} "cd ${DEPLOY_PATH} && unzip -o web.zip && rm web.zip"
 
-          echo "Deployment erfolgreich!"
+          echo "Deployment successful!"
 
+  # ============================================================================
+  # Create GitHub Release
+  # ============================================================================
   release:
-    needs: [build-python, build-electron]
+    needs: build
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.release == 'true' }}
     permissions:
@@ -209,15 +200,14 @@ jobs:
         run: |
           mkdir release
 
-          # Python App
-          cp artifacts/catknows-linux/catknows release/catknows-linux
-          cp artifacts/catknows-windows/catknows.exe release/catknows-windows.exe
-          cp artifacts/catknows-macos/catknows release/catknows-macos
+          # Linux
+          find artifacts/catknows-linux -name "*.AppImage" -exec cp {} release/CatKnows-linux.AppImage \; 2>/dev/null || true
 
-          # Electron Fetcher
-          cp artifacts/fetcher-linux/*.AppImage release/ 2>/dev/null || true
-          cp artifacts/fetcher-windows/*.exe release/fetcher-windows.exe 2>/dev/null || true
-          cp artifacts/fetcher-macos/*.zip release/fetcher-macos.zip 2>/dev/null || true
+          # Windows
+          find artifacts/catknows-windows -name "*.exe" -exec cp {} release/CatKnows-windows.exe \; 2>/dev/null || true
+
+          # macOS
+          find artifacts/catknows-macos -name "*.zip" -exec cp {} release/CatKnows-macos.zip \; 2>/dev/null || true
 
           ls -la release/
 

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>CatKnows - Error</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 40px;
+      text-align: center;
+    }
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 15px;
+      color: #f85149;
+    }
+    p {
+      color: #888;
+      font-size: 14px;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+    .retry-btn {
+      margin-top: 30px;
+      padding: 12px 30px;
+      background: #4a6cf7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .retry-btn:hover {
+      background: #3a5cd7;
+    }
+  </style>
+</head>
+<body>
+  <div class="icon">😿</div>
+  <h1>Failed to start server</h1>
+  <p>
+    The application server could not be started. This might be because:
+  </p>
+  <ul style="text-align: left; color: #888; margin-top: 15px; font-size: 13px;">
+    <li>Port 3000 is already in use</li>
+    <li>The application files are corrupted</li>
+    <li>Missing permissions</li>
+  </ul>
+  <button class="retry-btn" onclick="location.reload()">Try Again</button>
+</body>
+</html>
