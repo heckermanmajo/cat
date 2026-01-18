@@ -3,8 +3,37 @@ const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 
-const API_URL = 'http://localhost:3000';
-const API_PORT = 3000;
+let API_PORT = 3000;
+let API_URL = 'http://localhost:3000';
+
+function getPortFilePath() {
+  const isPackaged = app.isPackaged;
+  if (isPackaged) {
+    return path.join(path.dirname(process.execPath), '.port');
+  } else {
+    // Dev: .port is at project root (one level up from electron-fetcher)
+    return path.join(__dirname, '..', '.port');
+  }
+}
+
+function readPortFromFile() {
+  const fs = require('fs');
+  const portFile = getPortFilePath();
+  try {
+    if (fs.existsSync(portFile)) {
+      const port = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
+      if (port > 0) {
+        API_PORT = port;
+        API_URL = `http://localhost:${port}`;
+        console.log(`[main] Read port from file: ${port}`);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.log('[main] Could not read port file:', e.message);
+  }
+  return false;
+}
 
 let mainWindow;
 let skoolView;
@@ -92,6 +121,9 @@ function stopPythonServer() {
 
 async function waitForServer(maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
+    // Try to read port from file each attempt
+    readPortFromFile();
+
     try {
       const ready = await new Promise((resolve) => {
         const req = http.get(API_URL, (res) => {
@@ -102,7 +134,7 @@ async function waitForServer(maxAttempts = 30) {
       });
 
       if (ready) {
-        console.log('[main] Server is ready!');
+        console.log(`[main] Server is ready on port ${API_PORT}!`);
         return true;
       }
     } catch (e) {
@@ -143,19 +175,35 @@ async function createWindow() {
   mainWindow.loadFile('loading.html');
   mainWindow.show();
 
-  // Start Python server
-  let pythonStarted = false;
+  // Check if server is already running (started by start.sh)
+  readPortFromFile();
+  let serverReady = false;
+
   try {
-    pythonStarted = await startPythonServer();
+    serverReady = await new Promise((resolve) => {
+      const req = http.get(API_URL, (res) => resolve(res.statusCode === 200));
+      req.on('error', () => resolve(false));
+      req.setTimeout(500, () => { req.destroy(); resolve(false); });
+    });
   } catch (e) {
-    console.error('[main] Error starting Python:', e);
+    serverReady = false;
   }
 
-  // Wait for server to be ready
-  const serverReady = await waitForServer();
+  if (serverReady) {
+    console.log(`[main] Server already running on port ${API_PORT}`);
+  } else {
+    // Start Python server ourselves
+    try {
+      await startPythonServer();
+    } catch (e) {
+      console.error('[main] Error starting Python:', e);
+    }
+    // Wait for server to be ready
+    serverReady = await waitForServer();
+  }
 
   if (serverReady) {
-    console.log('[main] Loading web UI from localhost:3000');
+    console.log(`[main] Loading web UI from ${API_URL}`);
     mainWindow.loadURL(API_URL);
   } else {
     console.log('[main] Server not ready, showing error');

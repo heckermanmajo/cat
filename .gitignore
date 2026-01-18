@@ -1,5 +1,6 @@
 .claude/
 venv/
+.venv/
 .vscode/
 .idea/
 myversion/tmp/
@@ -8,9 +9,13 @@ myversion/tmp/
 *.sqlite
 **/catknows
 **/**.pyc
-pyversion/logs.txt
+**/logs.txt
 
-# Electron
+# Electron / Node.js
 node_modules/
+package-lock.json
 electron-fetcher/dist/
-electron-fetcher/package-lock.json
+electron-fetcher/out/
+*.log
+.npm/
+.port

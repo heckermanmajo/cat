@@ -14,13 +14,13 @@ on:
         default: false
         type: boolean
       version:
-        description: 'Release version (e.g. v1.0.0) - only needed if Release is enabled'
+        description: 'Release version (e.g. 1.0.0) - only needed if Release is enabled'
         required: false
         type: string
 
 jobs:
   # ============================================================================
-  # Build combined app (Python + Electron) for each platform
+  # Build combined app (Python + Electron + Launcher) for each platform
   # ============================================================================
   build:
     strategy:
@@ -30,15 +30,21 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             python_binary: catknows
+            launcher_binary: CatKnowsLauncher
             electron_artifact: "*.AppImage"
+            app_name: CatKnows.AppImage
           - os: windows-latest
             platform: windows
             python_binary: catknows.exe
+            launcher_binary: CatKnowsLauncher.exe
             electron_artifact: "*.exe"
+            app_name: CatKnows.exe
           - os: macos-latest
             platform: macos
             python_binary: catknows
+            launcher_binary: CatKnowsLauncher
             electron_artifact: "*.zip"
+            app_name: CatKnows.zip
 
     runs-on: ${{ matrix.os }}
 
@@ -66,19 +72,24 @@ jobs:
         run: python build.py
 
       # ========================================
-      # Step 2: Copy Python into Electron
+      # Step 2: Build Launcher
+      # ========================================
+      - name: Build Launcher with Nuitka
+        working-directory: launcher
+        run: python build.py
+
+      # ========================================
+      # Step 3: Copy Python into Electron
       # ========================================
       - name: Copy Python binary to Electron
         shell: bash
         run: |
           mkdir -p electron-fetcher/python
           cp myversion/dist/${{ matrix.python_binary }} electron-fetcher/python/
-          # Also copy static files that Python needs
-          cp -r myversion/static electron-fetcher/python/ 2>/dev/null || true
           ls -la electron-fetcher/python/
 
       # ========================================
-      # Step 3: Build Electron App
+      # Step 4: Build Electron App
       # ========================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -93,6 +104,26 @@ jobs:
         working-directory: electron-fetcher
         run: npm run build
 
+      # ========================================
+      # Step 5: Create distribution package
+      # ========================================
+      - name: Create distribution package
+        shell: bash
+        run: |
+          mkdir -p dist-package
+
+          # Copy Electron app (rename to standard name)
+          find electron-fetcher/dist -name "${{ matrix.electron_artifact }}" -exec cp {} dist-package/${{ matrix.app_name }} \; 2>/dev/null || true
+
+          # Copy launcher
+          cp launcher/dist/${{ matrix.launcher_binary }} dist-package/
+
+          # Copy version.txt
+          cp version.txt dist-package/
+
+          echo "=== Distribution package ==="
+          ls -la dist-package/
+
       - name: List build output
         shell: bash
         run: |
@@ -100,12 +131,19 @@ jobs:
           find electron-fetcher/dist -type f -name "*" 2>/dev/null | head -20 || true
 
       # ========================================
-      # Step 4: Upload artifact
+      # Step 6: Upload artifacts
       # ========================================
-      - name: Upload artifact
+      - name: Upload distribution package
         uses: actions/upload-artifact@v4
         with:
           name: catknows-${{ matrix.platform }}
+          path: dist-package/
+          if-no-files-found: error
+
+      - name: Upload Electron standalone (for updates)
+        uses: actions/upload-artifact@v4
+        with:
+          name: catknows-app-${{ matrix.platform }}
           path: electron-fetcher/dist/
           if-no-files-found: error
 
@@ -135,14 +173,27 @@ jobs:
         run: |
           mkdir -p webserver/downloads
 
+          # Copy version.txt for auto-updater (use input version if provided, else repo version)
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "${{ inputs.version }}" > webserver/downloads/version.txt
+          else
+            cp version.txt webserver/downloads/
+          fi
+
+          # === Standalone apps for auto-updater ===
           # Linux: AppImage
-          find artifacts/catknows-linux -name "*.AppImage" -exec cp {} webserver/downloads/CatKnows-linux.AppImage \; 2>/dev/null || echo "No Linux AppImage"
+          find artifacts/catknows-app-linux -name "*.AppImage" -exec cp {} webserver/downloads/CatKnows-linux.AppImage \; 2>/dev/null || echo "No Linux AppImage"
 
           # Windows: exe
-          find artifacts/catknows-windows -name "*.exe" -exec cp {} webserver/downloads/CatKnows-win.exe \; 2>/dev/null || echo "No Windows exe"
+          find artifacts/catknows-app-windows -name "*.exe" -exec cp {} webserver/downloads/CatKnows-win.exe \; 2>/dev/null || echo "No Windows exe"
 
           # macOS: zip
-          find artifacts/catknows-macos -name "*.zip" -exec cp {} webserver/downloads/CatKnows-mac.zip \; 2>/dev/null || echo "No macOS zip"
+          find artifacts/catknows-app-macos -name "*.zip" -exec cp {} webserver/downloads/CatKnows-mac.zip \; 2>/dev/null || echo "No macOS zip"
+
+          # === Full distribution ZIPs for initial download (with launcher) ===
+          cd artifacts/catknows-linux && zip -r ../../webserver/downloads/CatKnows-linux.zip ./* && cd ../..
+          cd artifacts/catknows-windows && zip -r ../../webserver/downloads/CatKnows-windows.zip ./* && cd ../..
+          cd artifacts/catknows-macos && zip -r ../../webserver/downloads/CatKnows-macos.zip ./* && cd ../..
 
           echo "=== Downloads folder ==="
           ls -la webserver/downloads/
@@ -184,12 +235,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Update version.txt
+        if: ${{ inputs.version != '' }}
+        run: |
+          echo "${{ inputs.version }}" > version.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add version.txt
+          git commit -m "chore: bump version to ${{ inputs.version }}" || true
+          git push || true
+
       - name: Create and push tag
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git tag ${{ inputs.version }}
-          git push origin ${{ inputs.version }}
+          git tag v${{ inputs.version }}
+          git push origin v${{ inputs.version }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -200,20 +261,16 @@ jobs:
         run: |
           mkdir release
 
-          # Linux
-          find artifacts/catknows-linux -name "*.AppImage" -exec cp {} release/CatKnows-linux.AppImage \; 2>/dev/null || true
-
-          # Windows
-          find artifacts/catknows-windows -name "*.exe" -exec cp {} release/CatKnows-windows.exe \; 2>/dev/null || true
-
-          # macOS
-          find artifacts/catknows-macos -name "*.zip" -exec cp {} release/CatKnows-macos.zip \; 2>/dev/null || true
+          # Create distribution ZIPs (with launcher)
+          cd artifacts/catknows-linux && zip -r ../../release/CatKnows-linux.zip ./* && cd ../..
+          cd artifacts/catknows-windows && zip -r ../../release/CatKnows-windows.zip ./* && cd ../..
+          cd artifacts/catknows-macos && zip -r ../../release/CatKnows-macos.zip ./* && cd ../..
 
           ls -la release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.version }}
+          tag_name: v${{ inputs.version }}
           files: release/*
           generate_release_notes: true

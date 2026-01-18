@@ -40,3 +40,11 @@ Im Frontend bevorzugen wir page-reload, weil es schnell ist und wenig komplexit�
 weil ja eh alles (python-server und sqlite-db auf der selben maschiene läuft).
 
 Jeder UI state sollte daher auch in der DB persistiert werden als "config-entry".
+
+## Testing
+
+Logik-Features (Filter, Queries, etc.) werden mit API-Tests in `tests/` getestet.
+Tests ausführen mit `./test_fast.sh` (schnell, gegen Python) oder `./test.sh` (mit Nuitka-Build).
+Bei neuen Logik-Features: Tests schreiben und mit `./test_fast.sh` verifizieren.
+
+Details siehe: `tests/testing.md`

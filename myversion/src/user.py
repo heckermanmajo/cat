@@ -68,7 +68,7 @@ class User(Model):
                     us.*,
                     ROW_NUMBER() OVER (
                         PARTITION BY community_slug, skool_id
-                        ORDER BY created_at DESC
+                        ORDER BY fetched_at DESC
                     ) AS rn
                 FROM {cls.__name__.lower()} us
                 WHERE {where_clause}

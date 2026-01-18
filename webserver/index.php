@@ -10,11 +10,11 @@ function detectPlatform(): string {
     return 'unknown';
 }
 
-// Download files per platform
+// Download files per platform (full distribution with launcher)
 const DOWNLOADS = [
-    'windows' => ['file' => 'CatKnows-win.exe', 'label' => 'Windows', 'icon' => '🪟'],
-    'mac'     => ['file' => 'CatKnows-mac.zip', 'label' => 'macOS', 'icon' => '🍎'],
-    'linux'   => ['file' => 'CatKnows-linux.AppImage', 'label' => 'Linux', 'icon' => '🐧'],
+    'windows' => ['file' => 'CatKnows-windows.zip', 'label' => 'Windows', 'icon' => '🪟'],
+    'mac'     => ['file' => 'CatKnows-macos.zip', 'label' => 'macOS', 'icon' => '🍎'],
+    'linux'   => ['file' => 'CatKnows-linux.zip', 'label' => 'Linux', 'icon' => '🐧'],
 ];
 
 $platform = detectPlatform();
